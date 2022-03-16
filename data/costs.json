@@ -1,0 +1,32 @@
+{
+    "spear": {
+        "wood": 50, "stone": 30, "iron": 10
+    },
+    "sword": {
+        "wood": 30, "stone": 30, "iron": 70
+    },
+    "axe": {
+        "wood": 60, "stone": 30, "iron": 40
+    },
+    "arch": {
+        "wood": 100, "stone": 30, "iron": 60
+    },
+    "spy": {
+        "wood": 50, "stone": 50, "iron": 20
+    },
+    "light": {
+        "wood": 125, "stone": 100, "iron": 250
+    },
+    "marcher": {
+        "wood": 250, "stone": 100, "iron": 150
+    },
+    "heavy": {
+        "wood": 200, "stone": 150, "iron": 600
+    },
+    "ram": {
+        "wood": 300, "stone": 200, "iron": 200
+    },
+    "catapult": {
+        "wood": 320, "stone": 400, "iron": 100
+    }
+}

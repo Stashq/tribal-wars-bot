@@ -6,7 +6,7 @@ class Barracks:
     spear: int = 0
     sword: int = 0
     axe: int = 0
-    arch: int = 0
+    archer: int = 0
 
 @dataclass
 class Stable:
@@ -31,7 +31,7 @@ class Scavengers:
     spear: int = 0
     sword: int = 0
     axe: int = 0
-    arch: int = 0
+    archer: int = 0
     light: int = 0
     marcher: int = 0
     heavy: int = 0

@@ -1,0 +1,8 @@
+{
+    "divide": 1,
+    "lvls": [2, 3, 4],
+    "except_":
+    {
+        "knight": "all"
+    }
+}

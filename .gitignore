@@ -7,3 +7,6 @@ chromedriver
 recruit_proportions.json
 priorities.csv
 tmp.ipynb
+
+__pycache__
+.vscode

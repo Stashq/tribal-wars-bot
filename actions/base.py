@@ -1,20 +1,24 @@
+from __future__ import annotations
 from abc import ABC, abstractmethod
+from datetime import datetime, timedelta
 import logging
 import numpy as np
 from selenium.webdriver.common.by import By
 import time
+from typing import Union, Type
 
-from action_input import ActionInput
-from datatypes import Cost
+from actions.action_input import ActionInput
+from data_types import Cost
 
 
 class Action(ABC):
     def __init__(self, input_: ActionInput):
         self.driver = input_.driver
-        self.base_url = 'https://pl%d.plemiona.pl/game.php?village=%d' % (input_.world_nr, input_.village)
+        self.base_url = 'https://pl%d.plemiona.pl/game.php?village=%d' % (input_.world_nr, input_.village_nr)
         self.fundraise = input_.fundraise
+        # self.fundraise_action = input_.fundraise_action
 
-    def sleep(mu: float = 1.345, sig: float = 0.35):
+    def sleep(self, mu: float = 1.345, sig: float = 0.35):
         rand = np.random.randn()
         time.sleep(
             abs(rand*sig + mu)
@@ -39,37 +43,57 @@ class Action(ABC):
             logging.error(msg)
             raise ValueError(msg)
 
-    def get_resources(self, include_fundraise: bool = False) -> Cost:
-        '''Returns order: wood, stone, iron'''
+    def get_resources(self) -> Cost:
         resources = Cost(
             int(self.driver.find_element(By.CSS_SELECTOR, '#wood').text),
             int(self.driver.find_element(By.CSS_SELECTOR, '#stone').text),
             int(self.driver.find_element(By.CSS_SELECTOR, '#iron').text)
         )
-
-        # substract established fundraise
-        if self.fundraise is not None:
-            self._substract_fundraise(resources)
+        
+        self._substract_fundraise(resources)
         return resources
 
     def _substract_fundraise(self, resources: Cost) -> Cost:
-        if resources.wood - self.fundraise.wood > 0:
-            resources.wood -= self.fundraise.wood
+        if resources.wood - self.fundraise["cost"].wood > 0:
+            resources.wood -= self.fundraise["cost"].wood
         else:
             resources.wood = 0
-        if resources.stone - self.fundraise.stone > 0:
-            resources.stone -= self.fundraise.stone
+        if resources.stone - self.fundraise["cost"].stone > 0:
+            resources.stone -= self.fundraise["cost"].stone
         else:
             resources.stone = 0
-        if resources.iron - self.fundraise.iron > 0:
-            resources.iron -= self.fundraise.iron
+        if resources.iron - self.fundraise["cost"].iron > 0:
+            resources.iron -= self.fundraise["cost"].iron
         else:
             resources.iron = 0
         return resources
 
     @abstractmethod
-    def run(self, *args, **kwargs):
+    def run(self, *args, **kwargs) -> Union[datetime, timedelta]:
         pass
 
-    def __call__(self, *args, **kwargs):
-        self.run(*args, **kwargs)
+    def __call__(self, *args, **kwargs) -> Union[datetime, timedelta]:
+        return self.run(*args, **kwargs)
+
+    @abstractmethod
+    def _get_waiting_time(self) -> timedelta:
+        pass
+
+    def _str_to_timedelta(self, delta_str: str, format_: str = "%H:%M:%S") -> timedelta:
+        delta = datetime.strptime(delta_str, format_)
+        delta = timedelta(hours=delta.hour, minutes=delta.minute, seconds=delta.second)
+        return delta
+
+    def log_next_attempt_warning(self, cmd: str, td: timedelta) -> timedelta:
+        next_attempt = datetime.now() + timedelta(hours=1)
+        next_attempt_str = next_attempt.strftime("%Y-%m-%d, %H:%M:%S")
+        logging.warning("Cannot %s. Next attempt at %s." % (cmd, next_attempt_str))
+
+    def set_fundraise(self, cost: Cost, action: Type[Action]):
+        self.fundraise["cost"].wood = cost.wood
+        self.fundraise["cost"].stone = cost.stone
+        self.fundraise["cost"].iron = cost.iron
+        self.fundraise["action"] = action
+        logging.info(
+            "Set fundraise: wood %d, stone %d, iron %d." % (cost.wood, cost.stone, cost.iron)
+        )
