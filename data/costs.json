@@ -8,7 +8,7 @@
     "axe": {
         "wood": 60, "stone": 30, "iron": 40
     },
-    "arch": {
+    "archer": {
         "wood": 100, "stone": 30, "iron": 60
     },
     "spy": {

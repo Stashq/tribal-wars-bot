@@ -1,3 +1,4 @@
+from __future__ import annotations
 from dataclasses import dataclass, fields
 
 
@@ -26,6 +27,14 @@ class Recruitment:
     stable: Stable = Stable()
     workshop: Workshop = Workshop()
 
+    def __post_init__(self):
+        if isinstance(self.barracks, dict):
+            self.barracks = Barracks(**self.barracks)
+        if isinstance(self.stable, dict):
+            self.stable = Stable(**self.stable)
+        if isinstance(self.workshop, dict):
+            self.workshop = Workshop(**self.workshop)
+
 @dataclass
 class Scavengers:
     spear: int = 0
@@ -52,3 +61,15 @@ class Cost:
     wood: int = 0
     stone: int = 0
     iron: int = 0
+
+    def all_less(self, cost2: Cost):
+        return (
+            self.wood < cost2.wood\
+                and self.stone < cost2.stone\
+                and self.iron < cost2.iron)
+
+    def all_greater(self, cost2: Cost):
+        return (
+            self.wood > cost2.wood\
+                and self.stone > cost2.stone\
+                and self.iron > cost2.iron)

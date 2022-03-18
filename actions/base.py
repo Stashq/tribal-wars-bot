@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 import logging
 import numpy as np
+import re
 from selenium.webdriver.common.by import By
 import time
 from typing import Union, Type
@@ -43,15 +44,31 @@ class Action(ABC):
             logging.error(msg)
             raise ValueError(msg)
 
-    def get_resources(self) -> Cost:
+    def get_resources(self, deduct_fundraise: bool = True) -> Cost:
         resources = Cost(
             int(self.driver.find_element(By.CSS_SELECTOR, '#wood').text),
             int(self.driver.find_element(By.CSS_SELECTOR, '#stone').text),
             int(self.driver.find_element(By.CSS_SELECTOR, '#iron').text)
         )
         
-        self._substract_fundraise(resources)
+        if deduct_fundraise:
+            resources = self._substract_fundraise(resources)
         return resources
+
+    def _get_increases(self):
+        increases = Cost(
+            wood=self._get_resource_increase("wood"),
+            stone=self._get_resource_increase("stone"),
+            iron=self._get_resource_increase("iron")
+        )
+        return increases
+
+    def _get_resource_increase(self, resource: str) -> int:
+        text = self.driver.find_element(
+            By.XPATH, '//*[@id="%s"]' % resource
+        ).title
+        return int(re.findall(r'\d+', text)[0])
+
 
     def _substract_fundraise(self, resources: Cost) -> Cost:
         if resources.wood - self.fundraise["cost"].wood > 0:
@@ -97,3 +114,9 @@ class Action(ABC):
         logging.info(
             "Set fundraise: wood %d, stone %d, iron %d." % (cost.wood, cost.stone, cost.iron)
         )
+
+    def _get_storage_size(self) -> int:
+        size = self.driver.find_element(
+            By.XPATH, '//*[@id="storage"]'
+        ).text
+        return int(size)

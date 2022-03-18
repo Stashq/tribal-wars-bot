@@ -1,0 +1,46 @@
+{
+    "percentage": 10,
+    "wood": {
+        "barracks": {
+            "spear": 1
+        }
+    },
+    "stone": {
+        "barracks": {
+            "sword": 1
+        },
+        "stable": {
+            "spy": 1
+        }
+    },
+    "iron": {
+        "barracks": {
+            "sword": 3
+        },
+        "stable": {
+            "light": 1
+        }
+    },
+    "wood_and_stone": {
+        "stable": {
+            "spy": 1
+        }
+    },
+    "wood_and_iron": {
+        "stable": {
+            "light": 1,
+            "marcher": 1
+        }
+    },
+    "stone_and_iron": {
+        "barracks": {
+            "sword": 1
+        }
+    },
+    "wood_and_stone_and_iron": {
+        "barracks": {
+            "spear": 1,
+            "sword": 1
+        }
+    }
+}

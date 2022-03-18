@@ -1,5 +1,7 @@
 # noqa: flake8
 # from build import Build
-from tactics.scavenge import ScavengeTactic
+from .scavenge import ScavengeTactic
+from .recruit import RecruitTactic
+from .prevent import PreventTactic
 # from farm import Farm
 # from train import Train

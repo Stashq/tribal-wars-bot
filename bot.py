@@ -3,24 +3,24 @@ from selenium.webdriver.common.by import By
 from dotenv import dotenv_values
 import time
 import numpy as np
-from typing import List, Iterable, Union, Type
+from typing import Union, Type
 from selenium.webdriver.chrome.service import Service
 from selenium.common.exceptions import NoSuchElementException
 from webdriver_manager.chrome import ChromeDriverManager
 from datetime import datetime, timedelta
 import logging
-import csv
 from selenium.webdriver.remote.command import Command
 
-from actions import Scavenge, ActionInput, Action, Train, Build
+from actions import Scavenge, ActionInput, Action, Train, Build, Recruit, Farm, Prevent
+from check_data import check_all_files
 from data_types import Cost
 from scheduler import Scheduler
 
 
 class Bot:
-    def __init__(self, world_nr: int = 175):
+    def __init__(self, world_nr: int = 175, safe_mode: bool = True):
         logging.basicConfig(
-            filename='scavegning.log',
+            filename='bot_run.log',
             format='%(asctime)s : %(message)s',
             level=logging.INFO
         )
@@ -29,6 +29,7 @@ class Bot:
         self.fundraise = {"cost": Cost(), "action": None}
         self.world_nr = world_nr
         self.scheduler = Scheduler()
+        self.safe_mode = safe_mode
 
     def init_driver(self):
         options = webdriver.ChromeOptions()
@@ -70,7 +71,6 @@ class Bot:
             self.driver.find_element(By.XPATH, '//*[@id="login_form"]/div/div/a')\
                 .click()
         except NoSuchElementException as e:
-            # print("Already logged in")
             pass
 
         self.choose_world(world_nr)
@@ -84,63 +84,6 @@ class Bot:
         #     .click()
         self.driver.find_element(By.XPATH, '//*[@id="home"]/div[3]/div[4]/div[10]/div[3]/div[2]/div[1]/a/span')\
             .click()
-
-    # def set_fundraise(self, wood: int, stone: int, iron: int, cmd: List[str]):
-    #     self.fundraise_cmd = cmd
-    #     self.fundraise = [wood, stone, iron]
-    #     logging.info(
-    #         "Set fundraise: wood %d, stone %d, iron %d." % (wood, stone, iron)
-    #     )
-
-    # def unset_fundraise(self):
-    #     self.fundraise_cmd = []
-    #     self.fundraise = [0, 0, 0]
-    #     logging.info("Fundraise unset.")
-
-    # def run_cmd(self, cmd: List[str]) -> bool:
-    #     try:
-    #         func = getattr(self, cmd[0])
-    #         runned = func(*cmd[1:])
-    #         if runned and self.compare_cmds(self.fundraise_cmd, cmd):
-    #             self.unset_fundraise()
-    #     except Exception as e:
-    #         runned = None
-        
-        # self.log_priority_run(runned, cmd)
-        # return runned
-
-    def compare_cmds(self, cmd1: List, cmd2: List) -> bool:
-        if isinstance(cmd1, Iterable):
-            cmd1 = [str(el) for el in cmd1]
-        if isinstance(cmd2, Iterable):
-            cmd2 = [str(el) for el in cmd2]
-        return str(cmd1) == str(cmd2)
-
-    def run_priorities(self, n: int = 1, break_after_fail: bool = True):
-        with open('priorities.csv', "r") as file:
-            cmds = list(csv.reader(file))
-
-        for i in range(n):
-            if len(cmds) == 0:
-                break
-
-            runned = self.run_cmd(cmds[0])
-
-            if runned:
-                cmds = cmds[1:]
-            elif not runned and break_after_fail:
-                break
-
-        with open('priorities.csv', "w") as file:
-            csv.writer(file).writerows(cmds)
-
-    def log_priority_run(self, runned: bool, cmd: str):
-        if runned:
-            logging.info("Priority: \"%s\" runned [v]" % str(cmd))
-        elif runned is False:
-            logging.warning("Priority: \"%s\" failed [x]" % str(cmd))
-        elif runned is None:
-            logging.warning("Problem with running priority \"%s\"." % str(cmd))
 
     def setup_next_visit_time(
         self,
@@ -158,12 +101,17 @@ class Bot:
         logging.info("Driver quited session.")
 
     def run_rutines(self):
+        self.run_action(Prevent)
         if self.scheduler.train is None:
             self.run_action(Train)
         if self.scheduler.build is None:
             self.run_action(Build)
         if self.scheduler.scavenge is None:
             self.run_action(Scavenge)
+        if self.scheduler.recruit is None:
+            self.run_action(Recruit)
+        if self.scheduler.farm is None:
+            self.run_action(Farm)
 
     def run_cycle(self):
         action = self.scheduler.wait()
@@ -174,10 +122,19 @@ class Bot:
         self.quit_session()
 
     def first_run(self):
+        check_all_files()
         self.init_driver()
         self.login(world_nr=175)
         self.run_rutines()
         self.quit_session()
+
+    def _deal_with_action_exception(self, e: Exception):
+        if not self.safe_mode:
+            raise e
+        self.log_error(e)
+        time_ = self.attempt_break
+        logging.info("Next attempt in " + str(time_))
+        return time_
 
     def run_action(self, Action_cls: Type[Action]):
         ai = ActionInput(
@@ -185,10 +142,12 @@ class Bot:
             world_nr=self.world_nr,
             village_nr=175,
             fundraise=self.fundraise,
-            # fundraise_action=self.fundraise_action
         )
         action = Action_cls(ai)
-        time_ = action.run()
+        try:
+            time_ = action.run()
+        except Exception as e:
+            time_ = self._deal_with_action_exception(e)
         if time_ is not None:
             self.setup_next_visit_time(time_, action)
         if self.fundraise["action"] == Action_cls:
@@ -198,13 +157,13 @@ class Bot:
         self.fundraise["cost"] = Cost()
         self.fundraise["action"] = None
 
-    def log_error(self):
+    def log_error(self, e):
         logging.error("Error! [x]")
-        try:
-            self.driver.save_screenshot("screenshot.png")
-            logging.error("Screenshot took.")
-        except Exception as e:
-            pass
+        logging.error(str(e))
+        if self._driver_is_alive():
+            self.driver.save_screenshot(
+                "error_screenshots/" + datetime.now().strftime("%Y-%m-%d, %H:%M:%S"))
+            logging.info("Screenshot took.")
 
     def _driver_is_alive(self) -> bool:
         try:
@@ -226,7 +185,7 @@ class Bot:
             while True:
                 self.run_cycle()
         except Exception as e:
-            self.log_error()
+            self.log_error(e)
             raise e
         except KeyboardInterrupt:
             logging.info("Keyboard interrupt.")

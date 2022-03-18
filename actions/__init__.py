@@ -6,3 +6,4 @@ from .scavenge import Scavenge
 from .farm import Farm
 from .train import Train
 from .recruit import Recruit
+from .prevent import Prevent

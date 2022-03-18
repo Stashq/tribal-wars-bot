@@ -22,8 +22,8 @@ class Scavenge(Action):
         super().__init__(input_)
 
     def load_tactic(self, path: Path = Path("data/scavenge.json")):
-        with open(path) as file:
-            tactic = json.loads(file.read())
+        with open(path, "r") as file:
+            tactic = json.load(file)
         lvls = self._filter_lvls(tactic["lvls"])
         tactic = ScavengeTactic(
             divide=tactic["divide"],
@@ -68,6 +68,7 @@ class Scavenge(Action):
         return troops
 
     def _run_scavenging(self, lvl: int, troops: Scavengers):
+        self.sleep()
         for unit, amount in asdict(troops).items():
             index = units_to_input_parser[unit]
 
@@ -76,7 +77,7 @@ class Scavenge(Action):
                 By.XPATH, '//*[@id="scavenge_screen"]/div/div[1]/table/tbody/tr[2]/td[%d]/input' % index)
             el.send_keys(str(amount))
 
-        self.sleep(10)
+        self.sleep()
         self.driver.find_element(
             By.XPATH, '//*[@id="scavenge_screen"]/div/div[2]/div[%d]/div[3]/div/div[2]/a[1]' % lvl
         ).click()

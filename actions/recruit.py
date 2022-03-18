@@ -1,4 +1,5 @@
-from dataclasses import asdict, fields
+from dataclasses import fields, asdict
+from datetime import timedelta
 import logging
 import json
 from pathlib import Path
@@ -8,77 +9,142 @@ from typing import List, Union
 from actions.base import Action
 from actions.action_input import ActionInput
 from data_types import Recruitment, Barracks, Stable, Workshop, Cost
+from tactics.recruit import RecruitTactic
 
 
 class Recruit(Action):
     def __init__(self, input_: ActionInput):
         super().__init__(input_)
+        self.costs = self._load_costs()
 
     def _load_costs(self, path: Path = Path("data/costs.json")) -> List[Cost]:
-        with open(path) as file:
-            costs = json.loads(file.read())
+        with open(path, "r") as file:
+            costs = json.load(file)
         costs = {unit: Cost(**cost) for unit, cost in costs.items()}
         return costs
 
-    def _load_recruitment_proportions(
+    def _load_recruit_tactic(
         self, path: Path = Path("data/recruit_proportions.json")
-    ) -> Recruitment:
-        with open(path) as file:
-            rp = json.loads(file.read())
-        rp = Recruitment(
-            Barracks(**rp["barracks"]),
-            Stable(**rp["stable"]),
-            Workshop(**rp["workshop"])
-        )
-        return rp
+    ) -> RecruitTactic:
+        with open(path, "r") as file:
+            rt = json.load(file)
+        res = RecruitTactic(**rt)
+        return res
         
-    def _count_requirements(self, rp: Recruitment, costs: List[Cost]) -> Cost:
+    def _count_requirements(self, rp: Recruitment) -> Cost:
         req = Cost()
         for building in fields(rp):
             units = getattr(rp, building.name)
             for unit in fields(units):
                 proportion = getattr(units, unit.name)
 
-                req.wood += costs[unit].wood * proportion
-                req.stone += costs[unit].stone * proportion
-                req.iron += costs[unit].iron * proportion
+                req.wood += self.costs[unit.name].wood * proportion
+                req.stone += self.costs[unit.name].stone * proportion
+                req.iron += self.costs[unit.name].iron * proportion
         return req
 
-    def _get_max_packs(self, rp: Recruitment, costs: List[Cost]):        
-        req = self._count_requirements(rp, costs)
-        wood, stone, iron = self.get_resources()
+    def _limit_resources(self, resources: Cost, savings: Cost, limits: Cost):
+        wood = self._limit_resource(
+            resource=resources.wood, saving=savings.wood,
+            fundraise=self.fundraise["cost"].wood, limit=limits.wood)
+        stone = self._limit_resource(
+            resource=resources.stone, saving=savings.stone,
+            fundraise=self.fundraise["cost"].stone, limit=limits.stone)
+        iron = self._limit_resource(
+            resource=resources.iron, saving=savings.iron,
+            fundraise=self.fundraise["cost"].iron, limit=limits.iron)
+        return Cost(wood, stone, iron)
+
+    def _limit_resource(self, resource: int, saving: int, fundraise: int, limit: int):
+        result = resource
+        if saving > fundraise:
+            result -= saving
+        else:
+            result -= fundraise
+        
+        if result > limit:
+            result = limit
+        elif result < 0:
+            result = 0
+        return result
+
+    def _get_max_packs(self, rt: RecruitTactic):        
+        req = self._count_requirements(rt.recruitment)
+        resources = self.get_resources(deduct_fundraise=False)
+        resources = self._limit_resources(resources, rt.savings, rt.limits)
 
         n_packs = int(min([
-            wood / req.wood, stone / req.stone, iron / req.iron
+            resources.wood / req.wood,
+            resources.stone / req.stone,
+            resources.iron / req.iron
         ]))
         return n_packs
 
-    def _proportions_to_recruitment(self, rp: Recruitment, n_packs: int) -> Recruitment:
+    def _scale_recruitment(self, rp: Recruitment, scale: Union[int, float]) -> Recruitment:
         for building in fields(rp):
             units = getattr(rp, building.name)
             for unit in fields(units):
                 amount = getattr(units, unit.name)
-                setattr(units, unit.name, n_packs * amount)
+                setattr(units, unit.name, int(scale * amount))
         return rp
 
+    def _get_proportional_recruitment(
+        self, rt: RecruitTactic
+    ) -> Recruitment:
+        n_packs = self._get_max_packs(rt)
+        rec = self._scale_recruitment(rt.recruitment, scale=n_packs)
+        return rec
+
+    def _adjust_recruitment(self, rt: RecruitTactic):
+        resources = self.get_resources(deduct_fundraise=False)
+        resources = self._limit_resources(resources, rt.savings, rt.limits)
+        
+        cost = self._count_requirements(rt.recruitment)
+        min_proportion = min([
+            resources.wood / cost.wood,
+            resources.stone / cost.stone,
+            resources.iron / cost.iron
+        ])
+        if min_proportion < 0:
+            res = self._scale_recruitment(
+                rt.recruitment,
+                scale=min_proportion
+            )
+        else:
+            res = rt.recruitment
+        return res
+
     def run(
-        self, path: Path = Path("data/recruit_proportions.json")
-    ):
-        rp = self._load_recruitment_proportions(path)
-        costs = self._load_costs()
+        self,
+        path: Path = Path("data/recruit.json"),
+        lowering_recources_path: Path = Path("data/recruit_to_lower_resources.json")
+    ) -> timedelta:
+        if lowering_recources_path.is_file():
+            rt = self._load_recruit_tactic(lowering_recources_path)
+            self.recruit(rt)
+            lowering_recources_path.unlink()  # removes file
 
-        n_packs = self._get_max_packs(rp, costs)
-        rec = self._proportions_to_recruitment(rp, n_packs)
+        rt = self._load_recruit_tactic(path)
+        self.recruit(rt)
 
-        self.recruit(rec)
+        return rt.time_delta
 
-    def recruit(self, rec: Recruitment):
-        if self._building_is_needed(rec.barracks):
-            self.recruit_in_building(rec.barracks, "barracks")
-        if self._building_is_needed(rec.stable):
-            self.recruit_in_building(rec.stable, "stable")
-        if self._building_is_needed(rec.workshop):
-            self.recruit_in_building(rec.workshop, "workshop")
+    def _tactic_to_recruitment(self, rt: RecruitTactic) -> Recruitment:
+        if rt.type_ == "proportions":
+            rec = self._get_proportional_recruitment(rt)
+        else:
+            rec = self._adjust_recruitment(rt)
+        return rec
+
+    def recruit(self, rt: RecruitTactic):
+        if rt.run:
+            rec = self._tactic_to_recruitment(rt)
+            if self._building_is_needed(rec.barracks):
+                self.recruit_in_building(rec.barracks, "barracks")
+            if self._building_is_needed(rec.stable):
+                self.recruit_in_building(rec.stable, "stable")
+            if self._building_is_needed(rec.workshop):
+                self.recruit_in_building(rec.workshop, "workshop")
 
     def _building_is_needed(self, units: Union[Barracks, Stable, Workshop]):
         res = False
@@ -91,7 +157,7 @@ class Recruit(Action):
     def recruit_in_building(self, units: Union[Barracks, Stable, Workshop], building_name: str):
         self.go_to(building_name)
         self.driver.execute_script("window.scrollTo(0, 2000)")
-        for unit, amount in units.items():
+        for unit, amount in asdict(units).items():
             if amount > 0:
                 self._write_unit_number(unit, amount)
         self.sleep()
@@ -104,3 +170,6 @@ class Recruit(Action):
             self.driver.find_element(By.CSS_SELECTOR, '#' + unit + '_0').send_keys(str(amount))
         except Exception as e:
             logging.warning("Cannot recruit %s" % unit)
+
+    def _get_waiting_time(self, recruit_tactic: RecruitTactic) -> timedelta:
+        return recruit_tactic.next_time

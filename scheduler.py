@@ -1,4 +1,4 @@
-from dataclasses import dataclass, asdict, fields
+from dataclasses import dataclass, asdict
 from datetime import datetime, timedelta
 import inspect
 import logging
@@ -6,6 +6,7 @@ import pause
 from typing import Type, Tuple, Union
 
 from actions import Action, Build, Farm, Recruit, Scavenge, Train
+
 
 @dataclass
 class Scheduler:
