@@ -8,6 +8,7 @@ recruit_proportions.json
 priorities.csv
 tmp.ipynb
 error_screenshots
+data/*
 
 __pycache__
 .vscode

@@ -3,6 +3,7 @@ from selenium.webdriver.common.by import By
 from dotenv import dotenv_values
 import time
 import numpy as np
+import traceback
 from typing import Union, Type
 from selenium.webdriver.chrome.service import Service
 from selenium.common.exceptions import NoSuchElementException
@@ -30,6 +31,7 @@ class Bot:
         self.world_nr = world_nr
         self.scheduler = Scheduler()
         self.safe_mode = safe_mode
+        self.attempt_break = timedelta(hours=1)
 
     def init_driver(self):
         options = webdriver.ChromeOptions()
@@ -132,6 +134,7 @@ class Bot:
         if not self.safe_mode:
             raise e
         self.log_error(e)
+        print("Continue running program...")
         time_ = self.attempt_break
         logging.info("Next attempt in " + str(time_))
         return time_
@@ -157,9 +160,10 @@ class Bot:
         self.fundraise["cost"] = Cost()
         self.fundraise["action"] = None
 
-    def log_error(self, e):
+    def log_error(self, e: Exception):
         logging.error("Error! [x]")
-        logging.error(str(e))
+        logging.exception(e)
+        traceback.print_exc()
         if self._driver_is_alive():
             self.driver.save_screenshot(
                 "error_screenshots/" + datetime.now().strftime("%Y-%m-%d, %H:%M:%S"))
@@ -186,7 +190,6 @@ class Bot:
                 self.run_cycle()
         except Exception as e:
             self.log_error(e)
-            raise e
         except KeyboardInterrupt:
             logging.info("Keyboard interrupt.")
         finally:

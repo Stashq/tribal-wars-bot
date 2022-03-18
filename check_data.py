@@ -4,7 +4,7 @@ from multiprocessing.sharedctypes import Value
 from pathlib import Path
 
 from data_types import Scavengers
-from tactics import RecruitTactic, ScavengeTactic
+from tactics import RecruitTactic, ScavengeTactic, TrainTactic
 
 
 def file_exists(path: Path):
@@ -115,6 +115,16 @@ def check_scavenge(
         raise ValueError("Bad scavenge.json tactic file.")
 
 
+def check_train(path: Path = Path('data/train.json')):
+    file_exists(path)
+    with open(path, "r") as file:
+        tactic = json.load(file)
+    try:
+        TrainTactic(**tactic)
+    except Exception as e:
+        raise ValueError("Bad train.json tactic file.")
+
+
 def check_all_files():
     check_build_to_prevent()
     check_build()
@@ -122,6 +132,7 @@ def check_all_files():
     check_recruit_to_prevent()
     check_costs()
     check_scavenge()
+    check_train()
 
 
 if __name__ == '__main__':

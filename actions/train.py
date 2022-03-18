@@ -1,7 +1,8 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
+import json
 import logging
 from selenium.webdriver.common.by import By
-from typing import Callable
+from typing import Callable, Literal
 
 from actions.base import Action
 from actions.action_input import ActionInput
@@ -11,15 +12,21 @@ class Train(Action):
     def __init__(self, input_: ActionInput):
         super().__init__(input_)
         self.in_training_panel = False
-        self.time_after_attempt = timedelta(minutes=15)
+        with open("data/train.json", "r") as file:
+            self.settings = json.load(file)
+        self.time_after_attempt = timedelta(
+            minutes=self.settings["minutes_after_attempt"])
 
     def run(self) -> timedelta:
-        self.go_to("statue")
-        if self._training_availability():
-            time_delta = self._run_in_training_panel(
-                self._start_training)
+        if not self.settings["run"]:
+            time_delta = None
         else:
-            time_delta = self._get_waiting_time()
+            self.go_to("statue")
+            if self._training_availability():
+                time_delta = self._run_in_training_panel(
+                    self._start_training)
+            else:
+                time_delta = self._get_waiting_time()
         return time_delta
 
     def _training_availability(self):
@@ -28,17 +35,11 @@ class Train(Action):
         return len(els) == 1
 
     def _get_training_cost(self):
-        wood = self.driver.find_element(
+        resource = self.driver.find_element(
             By.XPATH, '//*[@id="popup_box_knight_regimens"]/div/div[2]/div[2]'
         ).text
-        stone = self.driver.find_element(
-            By.XPATH, '//*[@id="popup_box_knight_regimens"]/div/div[2]/div[3]'
-        ).text
-        iron = self.driver.find_element(
-            By.XPATH, '//*[@id="popup_box_knight_regimens"]/div/div[2]/div[4]'
-        ).text
-        return Cost(
-            int(wood), int(stone), int(iron))
+        resource = int(resource.replace('.', ''))
+        return Cost(resource, resource, resource)
 
     def _run_in_training_panel(self, func: Callable, *args, **kwargs):
         self._go_to_training_panel()
@@ -55,7 +56,9 @@ class Train(Action):
     def _enough_resources(self):
         cost = self._get_training_cost()
         resources = self.get_resources()
-        return cost.all_less(resources)
+        resources = self.limit_resources(
+            resources, savings=Cost(**self.settings["savings"]), limits=Cost(**self.settings["limits"]))
+        return not cost.all_greater(resources)
 
     def _start_training(self) -> timedelta:
         time_delta = self._get_waiting_time()

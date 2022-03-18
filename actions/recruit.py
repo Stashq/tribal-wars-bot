@@ -43,35 +43,10 @@ class Recruit(Action):
                 req.iron += self.costs[unit.name].iron * proportion
         return req
 
-    def _limit_resources(self, resources: Cost, savings: Cost, limits: Cost):
-        wood = self._limit_resource(
-            resource=resources.wood, saving=savings.wood,
-            fundraise=self.fundraise["cost"].wood, limit=limits.wood)
-        stone = self._limit_resource(
-            resource=resources.stone, saving=savings.stone,
-            fundraise=self.fundraise["cost"].stone, limit=limits.stone)
-        iron = self._limit_resource(
-            resource=resources.iron, saving=savings.iron,
-            fundraise=self.fundraise["cost"].iron, limit=limits.iron)
-        return Cost(wood, stone, iron)
-
-    def _limit_resource(self, resource: int, saving: int, fundraise: int, limit: int):
-        result = resource
-        if saving > fundraise:
-            result -= saving
-        else:
-            result -= fundraise
-        
-        if result > limit:
-            result = limit
-        elif result < 0:
-            result = 0
-        return result
-
     def _get_max_packs(self, rt: RecruitTactic):        
         req = self._count_requirements(rt.recruitment)
         resources = self.get_resources(deduct_fundraise=False)
-        resources = self._limit_resources(resources, rt.savings, rt.limits)
+        resources = self.limit_resources(resources, rt.savings, rt.limits)
 
         n_packs = int(min([
             resources.wood / req.wood,
@@ -97,7 +72,7 @@ class Recruit(Action):
 
     def _adjust_recruitment(self, rt: RecruitTactic):
         resources = self.get_resources(deduct_fundraise=False)
-        resources = self._limit_resources(resources, rt.savings, rt.limits)
+        resources = self.limit_resources(resources, rt.savings, rt.limits)
         
         cost = self._count_requirements(rt.recruitment)
         min_proportion = min([

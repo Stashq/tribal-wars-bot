@@ -120,3 +120,28 @@ class Action(ABC):
             By.XPATH, '//*[@id="storage"]'
         ).text
         return int(size)
+
+    def limit_resources(self, resources: Cost, savings: Cost, limits: Cost):
+        wood = self._limit_resource(
+            resource=resources.wood, saving=savings.wood,
+            fundraise=self.fundraise["cost"].wood, limit=limits.wood)
+        stone = self._limit_resource(
+            resource=resources.stone, saving=savings.stone,
+            fundraise=self.fundraise["cost"].stone, limit=limits.stone)
+        iron = self._limit_resource(
+            resource=resources.iron, saving=savings.iron,
+            fundraise=self.fundraise["cost"].iron, limit=limits.iron)
+        return Cost(wood, stone, iron)
+
+    def _limit_resource(self, resource: int, saving: int, fundraise: int, limit: int):
+        result = resource
+        if saving > fundraise:
+            result -= saving
+        else:
+            result -= fundraise
+        
+        if result > limit:
+            result = limit
+        elif result < 0:
+            result = 0
+        return result
