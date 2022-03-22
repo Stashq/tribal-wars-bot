@@ -167,7 +167,9 @@ class Bot:
         if self._driver_is_alive():
             self.driver.save_screenshot(
                 "error_screenshots/" + datetime.now().strftime("%Y-%m-%d, %H:%M:%S"))
-            logging.info("Screenshot took.")
+            logging.warning("Screenshot took.")
+        else:
+            logging.warning("Driver is dead.")
 
     def _driver_is_alive(self) -> bool:
         try:

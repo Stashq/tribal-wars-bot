@@ -27,8 +27,12 @@ class ScavengeTactic:
             for troops in [self.troops_lvl1, self.troops_lvl2, self.troops_lvl3, self.troops_lvl4]:
                 assert not self._troops_are_empty(troops)
 
-    def get_troops_per_lvl(self, troops: Scavengers) -> Dict[int, Scavengers]:
-        available_troops = self._subtract_troops(troops, self.except_)[0]
+    def get_troops_per_lvl(
+        self,
+        available_troops: Scavengers,
+        transported_troops: Scavengers
+    ) -> Dict[int, Scavengers]:
+        available_troops = self._subtract_troops(available_troops, transported_troops, self.except_)[0]
         if len(self.lvls) == 0:
             result = {}
         elif self.divide == 1:
@@ -39,22 +43,30 @@ class ScavengeTactic:
                 available_troops, self.lvls)
         return result
 
-    def _subtract_troops(self, troops: Scavengers, subtrahend: Scavengers) -> Tuple[Scavengers]:
+    def _subtract_troops(
+        self,
+        available_troops: Scavengers,
+        transported_troops: Scavengers,
+        subtrahend: Scavengers
+    ) -> Tuple[Scavengers]:
         result = Scavengers()
         real_subtrahend = Scavengers()
         for unit in fields(Scavengers):
-            sub_value = getattr(subtrahend, unit.name)
-            trp_value = getattr(troops, unit.name)
+            sub = getattr(subtrahend, unit.name)
+            available = getattr(available_troops, unit.name)
+            trans = getattr(transported_troops, unit.name)
 
-            if sub_value == "all":
-                res_value = 0
+            if sub == "all":
+                res = 0
+            elif sub < trans:
+                res = available
             else:
-                res_value = trp_value - sub_value
-                if res_value < 0:
-                    res_value = 0
+                res = available + trans - sub
+                if res < 0:
+                    res = 0
 
-            setattr(result, unit.name, res_value)
-            setattr(real_subtrahend, unit.name, trp_value - res_value)
+            setattr(result, unit.name, res)
+            setattr(real_subtrahend, unit.name, available - res)
         return result, real_subtrahend
 
     def _adjust_troops_per_lvl(self, troops: Scavengers, lvls: List[int]) -> Dict[int, Scavengers]:

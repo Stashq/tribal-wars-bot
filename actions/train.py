@@ -2,7 +2,7 @@ from datetime import timedelta
 import json
 import logging
 from selenium.webdriver.common.by import By
-from typing import Callable, Literal
+from typing import Callable
 
 from actions.base import Action
 from actions.action_input import ActionInput

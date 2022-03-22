@@ -5,12 +5,14 @@ import logging
 from pathlib import Path
 import re
 from selenium.webdriver.common.by import By
-from typing import Literal, Union, Tuple
+from typing import Literal, Union, Tuple, Optional
 
 from actions.base import Action
 from actions.action_input import ActionInput
 from data_types import Cost
 
+(CAN_BUILD, FULL_QUEUE, LACK_OF_RESOURCES,\
+    UNMET_REQUIREMENTS, UNKNOWN_BUILDING, FULLY_DEVELOPED) = tuple(range(6))
 
 class Build(Action):
     def __init__(self, input_: ActionInput, path: Path = Path("data/build.csv")):
@@ -64,6 +66,12 @@ class Build(Action):
             '//*[@id="buildings_unmet"]/tbody//a[contains(@href, "%s")]' % building)
         return len(els) > 0
 
+    def _fully_developed(self, building: str):
+        els = self.driver.find_elements(
+            By.XPATH,
+            '//*[@id="main_buildrow_%s"]/td' % building)
+        return len(els) == 2
+
     def _unknown_building(self, building: str):
         res = building not in [
             "main", "barracks", "stable", "garage", "smith", "statue", "market",
@@ -78,29 +86,31 @@ class Build(Action):
         if len(els) > 0:
             text += 'Cell text: %s.' % els[0].text
         raise ValueError(text)
-             
-    def _assert_build(self, building: str):
+
+    def _assert_build(self, building: str) -> int:
         if self._can_build(building):
-            return True
+            return CAN_BUILD
         elif self._full_queue(building):
-            return False
+            return FULL_QUEUE
         elif self._lack_of_resources(building):
-            return False
+            return LACK_OF_RESOURCES
         elif self._unmet_requirements(building):
-            return False
+            return UNMET_REQUIREMENTS
         elif self._unknown_building(building):
-            return False
+            return UNKNOWN_BUILDING
+        elif self._fully_developed(building):
+            return FULLY_DEVELOPED
         else:
             self._raise_unknown_limitation_error(building)
 
-    def _get_waiting_time(self, building: str) -> timedelta:
-        if self._can_build(building):
+    def _get_waiting_time(self, building: str, state: int) -> timedelta:
+        if state == CAN_BUILD:
             delta = self.driver.find_element(
                 By.XPATH,
                 '//*[@id="main_buildrow_%s"]/td[5]' % building
             ).text
             waiting_time = self._str_to_timedelta(delta)
-        elif self._full_queue(building) or self._unmet_requirements(building):
+        elif state == FULL_QUEUE or state == UNMET_REQUIREMENTS:
             els = self.driver.find_elements(
                 By.XPATH,
                 '//*[@id="buildqueue"]/tr[2]/td[2]/span[@data-endtime]'
@@ -110,7 +120,7 @@ class Build(Action):
                 waiting_time = self._str_to_timedelta(delta)
             else:
                 waiting_time = None
-        elif self._lack_of_resources(building):
+        elif state == LACK_OF_RESOURCES:
             text = self.driver.find_element(
                 By.XPATH,
                 '//*[@id="main_buildrow_%s"]/td[7]/div[contains(text(), "Surowce dostępne")]' % building
@@ -126,6 +136,8 @@ class Build(Action):
                 raise ValueError("!!! Unknown text: %s" % text)
             waiting_time = waiting_time.replace(hour=int(text[-5:-3]))
             waiting_time = waiting_time.replace(minute=int(text[-2:]))
+        elif state == FULLY_DEVELOPED:
+            waiting_time = None
         else:
             raise ValueError("Unknown condition for building %s." % building)
         return waiting_time
@@ -195,7 +207,7 @@ class Build(Action):
     def _building_in_plan_queue(
         self, building: str, max_depth: int = None
     ):
-        if max_depth is None:
+        if max_depth is None or max_depth > len(self.commissions):
             max_depth = len(self.commissions)
         res = False
         for depth in range(max_depth):
@@ -226,18 +238,8 @@ class Build(Action):
             time_delta = self._skip_first_commission()
         return time_delta
 
-    def _build(self, building: str, fundraise: Union[str, int, bool]) -> timedelta:
-        can_run = self._assert_build(building)
-        waiting_time = self._get_waiting_time(building)
-
-        if can_run:
-            self.commission_building(building)
-        elif self._unknown_building(building):
-            logging.warning('Unknown building "%s".' % building)
-            waiting_time = self._skip_first_commission()
-        elif self._unmet_requirements(building):
-            waiting_time = self._deal_with_unmet_requirements(building)
-        elif self._requirements_over_90_percents(building)\
+    def _deal_with_lack_of_resources(self, building: str, fundraise: Union[str, int, bool]) -> Optional[timedelta]:
+        if self._requirements_over_90_percents(building)\
                 and building != "storage":
             self._add_commission("storage", "1")
             waiting_time = self._build("storage", "1")
@@ -245,6 +247,27 @@ class Build(Action):
             self.set_fundraise(
                 self._get_building_cost(building), type(self)
             )
+            waiting_time = None
+        return waiting_time
+
+    def _build(self, building: str, fundraise: Union[str, int, bool]) -> timedelta:
+        state = self._assert_build(building)
+        waiting_time = self._get_waiting_time(building, state)
+
+        if state == CAN_BUILD:
+            self.commission_building(building)
+        elif state == UNKNOWN_BUILDING:
+            logging.warning('Unknown building "%s".' % building)
+            waiting_time = self._skip_first_commission()
+        elif state == FULLY_DEVELOPED:
+            logging.warning('Building "%s" is fully developed.' % building)
+            waiting_time = self._skip_first_commission()
+        elif state == UNMET_REQUIREMENTS:
+            waiting_time = self._deal_with_unmet_requirements(building)
+        elif state == LACK_OF_RESOURCES:
+            time_delta = self._deal_with_lack_of_resources(building, fundraise)
+            if time_delta is not None:
+                waiting_time = time_delta
         return waiting_time
 
     def _get_building_cost(self, building: str):

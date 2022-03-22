@@ -1,5 +1,5 @@
 {
-    "run": "False",
+    "run": false,
     "type_": "proportions",
     "savings": {
         "wood": 7000,

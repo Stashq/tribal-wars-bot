@@ -7,6 +7,7 @@ import re
 from selenium.webdriver.common.by import By
 import time
 from typing import Union, Type
+from furl import furl
 
 from actions.action_input import ActionInput
 from data_types import Cost
@@ -31,12 +32,13 @@ class Action(ABC):
         self.driver.get(url)
 
         if mode is not None:
-            self._go_to_mode(url, mode)
+            self.change_mode(mode)
 
-    def _go_to_mode(self, screen_url: str, mode: str):
+    def change_mode(self, mode: str):
         self.sleep()
-        url = screen_url + '&mode=' + mode
-        self.driver.get(url)
+        url = furl(self.driver.current_url)
+        url.args['mode'] = mode
+        self.driver.get(url.url)
 
         els = self.driver.find_elements(By.XPATH, '//div[@class="content" and text()="Niewłaściwy tryb"]')
         if len(els) > 0:

@@ -81,26 +81,15 @@ class Prevent(Action):
             percentage=prevention["percentage"],
             **{
                 name: Recruitment(
-                    barracks=Barracks(**values["barracks"]),
-                    stable=Stable(**values["stable"]),
-                    workshop=Workshop(**values["workshop"])
+                    barracks=Barracks(**values.get("barracks")),
+                    stable=Stable(**values.get("stable")),
+                    workshop=Workshop(**values.get("workshop"))
                 )
                 for name, values in prevention.items()
                 if name != "percentage"
             }
         )
         return prevention_tactic
-
-    # def _add_to_build_queue(self, building: str, path: Path = Path("data/build.csv")):
-    #     assert building in ["storage", "farm", "hide"]
-
-    #     with open(path, "r") as file:
-    #         commissions = list(csv.reader(file))
-    #     if len(commissions) > 0 and commissions[0][0] != building:
-    #         commissions = [[building, 1]] + commissions
-    #         with open(path, "w") as file:
-    #             csv.writer(file).writerows(
-    #                 commissions)
 
     def _resource_not_fit(self, id_: str):
         el = self.driver.find_element(

@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import json
 from selenium.webdriver.common.by import By
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 
 from actions.base import Action
 from actions.action_input import ActionInput
@@ -14,6 +14,10 @@ from tactics.scavenge import ScavengeTactic
 units_to_input_parser = {
     "spear": 1, "sword": 2, "axe": 3, "archer": 4,
     "light": 5, "marcher": 6, "heavy": 7, "knight": 8
+}
+
+int_to_unit_td_parser = {
+    0: 1, 1: 2, 2: 3, 3: 4, 4: 6, 5: 7, 6: 8, 7: 11
 }
 
 
@@ -58,15 +62,6 @@ class Scavenge(Action):
                 free_sessions += [lvl]
         return free_sessions
 
-    def _get_available_troops(self) -> Scavengers:
-        units = [None] * 8
-        for i in range(1, 9):
-            el = self.driver.find_element(
-                By.XPATH, '//*[@id="scavenge_screen"]/div/div[1]/table/tbody/tr[2]/td[%d]/a' % i)
-            units[i-1] = int(el.text[1:-1])
-        troops = Scavengers(*units)
-        return troops
-
     def _run_scavenging(self, lvl: int, troops: Scavengers):
         self.sleep()
         for unit, amount in asdict(troops).items():
@@ -96,15 +91,49 @@ class Scavenge(Action):
             waiting_times += [delta]
         return min(waiting_times)
 
+    def _get_available_troops(self) -> Scavengers:
+        units = [None] * 8
+        for i in range(8):
+            el = self.driver.find_element(
+                By.XPATH,
+                '//*[@id="units_home"]/tbody/tr[2]/td[%d]' % (int_to_unit_td_parser[i] + 3))
+            units[i] = int(el.text)
+        troops = Scavengers(*units)
+        return troops
+
+    def _transpored_troops_exists(self):
+        els = self.driver.find_elements(By.XPATH, '//*[@id="units_transit"]')
+        return len(els) > 0
+
+    def _get_transported_troops(self):
+        if self._transpored_troops_exists():
+            units = [None] * 8
+            for i in range(8):
+                el = self.driver.find_element(
+                    By.XPATH,
+                    '//*[@id="units_transit"]/tbody/tr[2]/td[%d]' % (int_to_unit_td_parser[i] + 1))
+                units[i] = int(el.text)
+            troops = Scavengers(*units)
+        else:
+            troops = Scavengers()
+        return troops
+
+    def _get_troops_info(self) -> Tuple[Scavengers, Scavengers]:
+        available_troops = self._get_available_troops()
+        transported_troops = self._get_transported_troops()
+        return available_troops, transported_troops
 
     def run(self, path: Path = Path("data/scavenge.json"), *args, **kwargs) -> timedelta:
-        self.go_to(screen="place", mode="scavenge")
+        self.go_to(screen="place", mode="units")
+        available_troops, transported_troops = self._get_troops_info()
+
+        self.change_mode(mode="scavenge")
         self.sleep()
         self.driver.execute_script("window.scrollTo(0, 884)")
-        st = self.load_tactic(path)
-        available_troops = self._get_available_troops()
 
-        troops_per_lvl = st.get_troops_per_lvl(available_troops)
+        st = self.load_tactic(path)
+        troops_per_lvl = st.get_troops_per_lvl(
+            available_troops, transported_troops)
         for lvl, troops in troops_per_lvl.items():
             self._run_scavenging(lvl, troops)
 
