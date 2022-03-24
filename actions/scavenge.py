@@ -73,9 +73,10 @@ class Scavenge(Action):
             el.send_keys(str(amount))
 
         self.sleep()
-        self.driver.find_element(
+        el = self.driver.find_element(
             By.XPATH, '//*[@id="scavenge_screen"]/div/div[2]/div[%d]/div[3]/div/div[2]/a[1]' % lvl
-        ).click()
+        )
+        el.click()
 
     def _get_waiting_time(self) -> timedelta:
         self.sleep(2)

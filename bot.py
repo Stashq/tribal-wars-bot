@@ -191,6 +191,8 @@ class Bot:
             while True:
                 self.run_cycle()
         except Exception as e:
+            if not self.safe_mode:
+                raise e
             self.log_error(e)
         except KeyboardInterrupt:
             logging.info("Keyboard interrupt.")

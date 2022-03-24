@@ -4,6 +4,7 @@ import json
 import logging
 from pathlib import Path
 import re
+from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 from typing import Literal, Union, Tuple, Optional
 
@@ -24,11 +25,27 @@ class Build(Action):
 
     def commission_building(self, building: str):
         self.sleep()
-        self.driver.find_element(
-            By.XPATH,
-            '//a[(contains(text(), "Poziom") or contains(text(), "Wybuduj")) '\
-            'and contains(@id, "main_buildlink_%s") and not (@style="display:none")]' % building
-        ).click()
+
+        def commit(y_pos: int) -> bool:
+            self.driver.execute_script("window.scrollTo(0, %d)" % y_pos)
+            els = self.driver.find_elements(
+                By.XPATH,
+                '//a[(contains(text(), "Poziom") or contains(text(), "Wybuduj")) '\
+                'and contains(@id, "main_buildlink_%s") and not (@style="display:none")]' % building
+            )
+            if len(els) > 0:
+                els[0].click()
+                return True
+            else:
+                return False
+
+        commited = commit(y_pos=500)
+        if not commited:
+            commited = commit(y_pos=1000)
+        if not commited:
+            raise NoSuchElementException('Cannot click on building "%s".' % building)
+
+        self.driver.execute_script("window.scrollTo(0, 0)")
         self._remove_first_commission()
 
     def _remove_first_commission(self) -> Tuple[str, int]:

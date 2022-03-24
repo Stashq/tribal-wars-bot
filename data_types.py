@@ -28,11 +28,19 @@ class Recruitment:
     workshop: Workshop = Workshop()
 
     def __post_init__(self):
-        if isinstance(self.barracks, dict):
+        if self.barracks is None:
+            self.barracks = Barracks()
+        elif isinstance(self.barracks, dict):
             self.barracks = Barracks(**self.barracks)
-        if isinstance(self.stable, dict):
+
+        if self.stable is None:
+            self.stable = Stable()
+        elif isinstance(self.stable, dict):
             self.stable = Stable(**self.stable)
-        if isinstance(self.workshop, dict):
+
+        if self.workshop is None:
+            self.workshop = Workshop()
+        elif isinstance(self.workshop, dict):
             self.workshop = Workshop(**self.workshop)
 
 @dataclass

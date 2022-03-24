@@ -50,9 +50,10 @@ class Prevent(Action):
     def _deal_with_resources_overflow(self, overflow: dict):
         pt = self._load_prevent_tactic()
         rec = self._select_recruitment(overflow, pt)
-        size = self._get_storage_size() * pt.percentage / 100
+        size = int(self._get_storage_size() * pt.percentage / 100)
         rt = RecruitTactic(
-            run=True, type_="proportions", limit=Cost(*[size]*3), recruitment=rec
+            run=True, type_="proportions", limits=Cost(*[size]*3),
+            recruitment=rec#, time_delta=timedelta
         )
         rt.to_json()
         logging.warning("Resources overflow. Recruit commissioned.")
@@ -77,19 +78,8 @@ class Prevent(Action):
     def _load_prevent_tactic(self, path: Path = Path("data/prevent.json")):
         with open(path, "r") as file:
             prevention = json.load(file)
-        prevention_tactic = PreventTactic(
-            percentage=prevention["percentage"],
-            **{
-                name: Recruitment(
-                    barracks=Barracks(**values.get("barracks")),
-                    stable=Stable(**values.get("stable")),
-                    workshop=Workshop(**values.get("workshop"))
-                )
-                for name, values in prevention.items()
-                if name != "percentage"
-            }
-        )
-        return prevention_tactic
+        pt = PreventTactic(**prevention)
+        return pt
 
     def _resource_not_fit(self, id_: str):
         el = self.driver.find_element(

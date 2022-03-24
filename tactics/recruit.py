@@ -40,8 +40,8 @@ class RecruitTactic:
         path: Path = Path(
             "data/recruit_to_prevent.json")
     ):
-        self.next_time = datetime.strftime(
-            self.next_time, "%H:%M:%S"
-        )
+        # self.time_delta = datetime.strftime(
+        #     self.time_delta, "%H:%M:%S"
+        # )
         with open(path, "w") as file:
             json.dump(asdict(self), file)
