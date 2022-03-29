@@ -38,6 +38,7 @@ class Scavenge(Action):
             troops_lvl3=Scavengers(**tactic.get("lvl3", {})),
             troops_lvl4=Scavengers(**tactic.get("lvl4", {}))
         )
+        self.time_after_attempt = timedelta(minutes=60)
         return tactic
 
     def _filter_lvls(self, lvls: List[int]):
@@ -63,6 +64,8 @@ class Scavenge(Action):
         return free_sessions
 
     def _run_scavenging(self, lvl: int, troops: Scavengers):
+        if troops.is_empty():
+            return
         self.sleep()
         for unit, amount in asdict(troops).items():
             index = units_to_input_parser[unit]
@@ -85,12 +88,16 @@ class Scavenge(Action):
             '//*[@id="scavenge_screen"]/div/div[2]/div/div[3]/div/ul/li[4]/span[@class="return-countdown"]'
         )
 
-        waiting_times = []
-        for el in els:
-            delta = datetime.strptime(el.text, "%H:%M:%S")
-            delta = timedelta(hours=delta.hour, minutes=delta.minute, seconds=delta.second)
-            waiting_times += [delta]
-        return min(waiting_times)
+        if len(els) == 0:
+            waiting_time = self.time_after_attempt
+        else:
+            waiting_times = []
+            for el in els:
+                delta = datetime.strptime(el.text, "%H:%M:%S")
+                delta = timedelta(hours=delta.hour, minutes=delta.minute, seconds=delta.second)
+                waiting_times += [delta]
+                waiting_times = min(waiting_times)
+        return waiting_time
 
     def _get_available_troops(self) -> Scavengers:
         units = [None] * 8

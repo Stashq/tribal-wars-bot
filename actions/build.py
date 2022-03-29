@@ -28,18 +28,19 @@ class Build(Action):
 
         def commit(y_pos: int) -> bool:
             self.driver.execute_script("window.scrollTo(0, %d)" % y_pos)
-            els = self.driver.find_elements(
-                By.XPATH,
-                '//a[(contains(text(), "Poziom") or contains(text(), "Wybuduj")) '\
-                'and contains(@id, "main_buildlink_%s") and not (@style="display:none")]' % building
-            )
-            if len(els) > 0:
-                els[0].click()
+            try:
+                self.driver.find_element(
+                    By.XPATH,
+                    '//a[(contains(text(), "Poziom") or contains(text(), "Wybuduj")) '\
+                    'and contains(@id, "main_buildlink_%s") and not (@style="display:none")]' % building
+                ).click()
                 return True
-            else:
+            except:
                 return False
 
-        commited = commit(y_pos=500)
+        commited = commit(y_pos=0)
+        if not commited:
+            commited = commit(y_pos=500)
         if not commited:
             commited = commit(y_pos=1000)
         if not commited:

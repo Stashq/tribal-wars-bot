@@ -19,7 +19,12 @@ from scheduler import Scheduler
 
 
 class Bot:
-    def __init__(self, world_nr: int = 175, safe_mode: bool = True):
+    def __init__(
+        self,
+        world_nr: int = 175,
+        safe_mode: bool = True,
+        prevent: bool = True
+    ):
         logging.basicConfig(
             filename='bot_run.log',
             format='%(asctime)s : %(message)s',
@@ -32,6 +37,7 @@ class Bot:
         self.scheduler = Scheduler()
         self.safe_mode = safe_mode
         self.attempt_break = timedelta(hours=1)
+        self.prevent = prevent
 
     def init_driver(self):
         options = webdriver.ChromeOptions()
@@ -103,7 +109,9 @@ class Bot:
         logging.info("Driver quited session.")
 
     def run_rutines(self):
-        self.run_action(Prevent)
+        if self.prevent:
+            self.run_action(Prevent)
+
         if self.scheduler.train is None:
             self.run_action(Train)
         if self.scheduler.build is None:

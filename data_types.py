@@ -55,14 +55,20 @@ class Scavengers:
     knight: int = 0
 
     def __eq__(self, other):
-        result = True
         for unit in fields(self):
             this_val = getattr(self, unit.name)
             other_val = getattr(other, unit.name)
             if this_val != other_val:
-                result = False
-                break
-        return result
+                return False
+        return True
+
+    def is_empty(self):
+        for unit in fields(self):
+            this_val = getattr(self, unit.name)
+            if this_val != 0:
+                return False
+        return True
+
 
 @dataclass
 class Cost:
