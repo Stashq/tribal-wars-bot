@@ -11,6 +11,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from datetime import datetime, timedelta
 import logging
 from selenium.webdriver.remote.command import Command
+from typing import Tuple, Dict
 
 from actions import Scavenge, ActionInput, Action, Train, Build, Recruit, Farm, Prevent
 from check_data import check_all_files
@@ -23,7 +24,9 @@ class Bot:
         self,
         world_nr: int = 175,
         safe_mode: bool = True,
-        prevent: bool = True
+        prevent: bool = True,
+        allow_time_reducing = False,
+        pp_limit: int = 9999999
     ):
         logging.basicConfig(
             filename='bot_run.log',
@@ -38,6 +41,8 @@ class Bot:
         self.safe_mode = safe_mode
         self.attempt_break = timedelta(hours=1)
         self.prevent = prevent
+        self.allow_time_reducing = allow_time_reducing
+        self.pp_limit = pp_limit
 
     def init_driver(self):
         options = webdriver.ChromeOptions()
@@ -95,12 +100,10 @@ class Bot:
 
     def setup_next_visit_time(
         self,
-        time_: Union[datetime, timedelta],
         action: Action,
-        additional_minutes: int = 0
+        action_res: Union[timedelta, Tuple[timedelta, str], Dict[str, timedelta]],
     ):
-        time_ = time_ + timedelta(minutes=additional_minutes)
-        self.scheduler.set_waiting_time(time_, action)
+        self.scheduler.set_waiting_time(action, action_res)
 
     def quit_session(self):
         self.sleep(2)
@@ -115,7 +118,9 @@ class Bot:
         if self.scheduler.train is None:
             self.run_action(Train)
         if self.scheduler.build is None:
-            self.run_action(Build)
+            self.run_action(
+                Build,
+                allow_time_reducing=self.allow_time_reducing)
         if self.scheduler.scavenge is None:
             self.run_action(Scavenge)
         if self.scheduler.recruit is None:
@@ -124,12 +129,21 @@ class Bot:
             self.run_action(Farm)
 
     def run_cycle(self):
-        action = self.scheduler.wait()
+        Action_, com_id = self.scheduler.wait()
+        kwargs = self.get_action_kwargs(Action_, com_id)
         self.init_driver()
         self.login(world_nr=175)
-        self.run_action(action)
+        self.run_action(Action_, **kwargs)
         self.run_rutines()
         self.quit_session()
+
+    def get_action_kwargs(self, Action_: Type[Action], com_id: str) -> Tuple[Tuple, Dict]:
+        kwargs = {}
+        if Action_ == Build:
+            kwargs['allow_time_reducing'] = self.allow_time_reducing
+        if com_id is not None:
+            kwargs['com_id'] = com_id
+        return kwargs
 
     def first_run(self):
         check_all_files()
@@ -147,22 +161,32 @@ class Bot:
         logging.info("Next attempt in " + str(time_))
         return time_
 
-    def run_action(self, Action_cls: Type[Action]):
+    def run_action(self, Action_cls: Type[Action], *args, **kwargs):
         ai = ActionInput(
             driver=self.driver,
             world_nr=self.world_nr,
             village_nr=175,
             fundraise=self.fundraise,
+            pp_limit=self.pp_limit
         )
-        action = Action_cls(ai)
+        action = Action_cls(ai, *args, **kwargs)
         try:
-            time_ = action.run()
+            res = action.run()
         except Exception as e:
-            time_ = self._deal_with_action_exception(e)
-        if time_ is not None:
-            self.setup_next_visit_time(time_, action)
+            res = self._deal_with_action_exception(e)
+            res = (res, kwargs.get('com_id'))
+        if res is not None:
+            self.setup_next_visit_time(action, res)
         if self.fundraise["action"] == Action_cls:
             self._reset_fundraise()
+
+    def _parse_action_res(self, res) -> Tuple[timedelta, str]:
+        try:
+            time_, com_id = res
+        except:
+            time_ = res
+            com_id = None
+        return time_, com_id
 
     def _reset_fundraise(self):
         self.fundraise["cost"] = Cost()

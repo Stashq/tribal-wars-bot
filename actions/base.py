@@ -18,7 +18,7 @@ class Action(ABC):
         self.driver = input_.driver
         self.base_url = 'https://pl%d.plemiona.pl/game.php?village=%d' % (input_.world_nr, input_.village_nr)
         self.fundraise = input_.fundraise
-        # self.fundraise_action = input_.fundraise_action
+        self.pp_limit = input_.pp_limit
 
     def sleep(self, mu: float = 1.345, sig: float = 0.35):
         rand = np.random.randn()
@@ -122,6 +122,12 @@ class Action(ABC):
             By.XPATH, '//*[@id="storage"]'
         ).text
         return int(size)
+
+    def _get_pp(self) -> int:
+        pp = self.driver.find_element(
+            By.XPATH, '//*[@id="premium_points"]'
+        ).text
+        return int(pp)
 
     def limit_resources(self, resources: Cost, savings: Cost, limits: Cost):
         wood = self._limit_resource(

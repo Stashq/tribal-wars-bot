@@ -12,3 +12,4 @@ class ActionInput:
     village_nr: int
     fundraise: Dict = field(
         default_factory=lambda: {"cost": Cost(), "action": None})
+    pp_limit: int = 9999999

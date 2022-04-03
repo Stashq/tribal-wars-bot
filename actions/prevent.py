@@ -7,7 +7,7 @@ from selenium.webdriver.common.by import By
 from typing import Dict
 
 from actions import Action, ActionInput
-from data_types import Cost, Barracks, Stable, Workshop, Recruitment
+from data_types import Cost, Recruitment
 from tactics import PreventTactic, RecruitTactic
 
 
@@ -28,6 +28,7 @@ class Prevent(Action):
             self._deal_with_overpopulation(overflow)
         else:
             self._deal_with_resources_overflow(overflow)
+        return None
 
     def _deal_with_overpopulation(
         self, overflow: dict, path: Path = Path("data/build_to_prevent.json")

@@ -1,7 +1,5 @@
 from dataclasses import dataclass, fields
 
-from numpy import isin
-
 from data_types import Recruitment
 
 
@@ -17,12 +15,6 @@ class PreventTactic:
     wood_and_stone_and_iron: Recruitment = Recruitment()
 
     def __post_init__(self):
-        def get_place(Building_cls, values):
-            if values is None:
-                return Building_cls()
-            else:
-                return Building_cls(**values)
-        
         if not isinstance(self.percentage, int):
             self.percentage = int(self.percentage)
         

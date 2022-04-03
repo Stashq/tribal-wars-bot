@@ -6,7 +6,7 @@ from pathlib import Path
 import re
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
-from typing import Literal, Union, Tuple, Optional
+from typing import Literal, List, Union, Tuple, Optional
 
 from actions.base import Action
 from actions.action_input import ActionInput
@@ -16,14 +16,20 @@ from data_types import Cost
     UNMET_REQUIREMENTS, UNKNOWN_BUILDING, FULLY_DEVELOPED) = tuple(range(6))
 
 class Build(Action):
-    def __init__(self, input_: ActionInput, path: Path = Path("data/build.csv")):
+    def __init__(
+        self,
+        input_: ActionInput,
+        path: Path = Path("data/build.csv"),
+        allow_time_reducing: bool = False
+    ):
         super().__init__(input_)
         self.path = path
         with open(path, "r") as file:
             commissions = list(csv.reader(file))
         self.commissions = commissions
+        self.allow_time_reducing = allow_time_reducing
 
-    def commission_building(self, building: str):
+    def commission_building(self, building: str, max_time: timedelta = None):
         self.sleep()
 
         def commit(y_pos: int) -> bool:
@@ -49,12 +55,57 @@ class Build(Action):
         self.driver.execute_script("window.scrollTo(0, 0)")
         self._remove_first_commission()
 
-    def _remove_first_commission(self) -> Tuple[str, int]:
-        building, fundraise = self.commissions.pop(0)
+        self.sleep()
+        waiting_time = self._get_building_time(pos=-1)
+        while self._if_reduce_time(waiting_time, max_time):
+            self._reduce_time(pos=-1)
+
+            self.sleep()
+            old_waiting_time = waiting_time
+            waiting_time = self._get_building_time(pos=-1)
+            logging.info(
+                'Time of buliding "%s" reduced from %s to %s'\
+                % (building, str(old_waiting_time), str(waiting_time)))
+        return waiting_time
+
+    def _if_reduce_time(self, waiting_time: timedelta, max_time: timedelta = None) -> bool:
+        enough_pp = self._get_pp() > self.pp_limit
+        return (
+            self.allow_time_reducing
+            and max_time is not None
+            and waiting_time > max_time
+            and enough_pp
+        )
+
+    def _get_building_time(self, pos: int) -> timedelta:
+        els = self.driver.find_elements(By.XPATH, '//*[@id="buildqueue"]/tr/td[2]/span')
+        time_delta = self._str_to_timedelta(els[pos].text)
+        return time_delta
+
+    def _reduce_time(self, pos: int):
+        self.sleep()
+        els = self.driver.find_elements(By.XPATH, '//*[@id="buildqueue"]/tr/td[3]/a[1]')
+        els[pos].click()
+
+        self.sleep()
+        els = self.driver.find_elements(By.XPATH, '//*[@id="pp_prompt"]')
+        if len(els) > 0:
+            if els[0].is_selected():
+                els[0].click()
+
+            self.sleep()
+            self.driver.find_element(
+                By.XPATH, '//*[@id="confirmation-box"]//button[contains(text(),"Potwierdź")]'
+            ).click()
+
+    def _remove_first_commission(self) -> List:
+        row = self.commissions.pop(0)
         with open(self.path, "w") as file:
             csv.writer(file).writerows(
                 self.commissions)
-        return building, fundraise
+        if len(row) < 3:
+            row += [None]
+        return row
 
     def _can_build(self, building: str):
         els = self.driver.find_elements(
@@ -174,10 +225,14 @@ class Build(Action):
                 self.commissions)
 
     def _get_first_commission(self) -> Tuple[str, int]:
-        if len(self.commissions) > 0:
-            return self.commissions[0]
+        row = self.commissions[0]
+        if len(row) == 2:
+            row += [None]
+        elif len(row) == 3:
+            pass
         else:
-            return None, None
+            raise ValueError('Wrong number of arguments: "%s".' % str(row))
+        return row
 
     def run(self):
         self.go_to(screen="main")
@@ -185,8 +240,8 @@ class Build(Action):
         if len(self.commissions) == 0:
             return None
 
-        building, fundraise = self._get_first_commission()
-        waiting_time = self._build(building, fundraise)
+        row = self._get_first_commission()
+        waiting_time = self._build(row)
         return waiting_time
 
     def _build_priorities(
@@ -241,16 +296,15 @@ class Build(Action):
         self._remove_first_commission()
         logging.warning("Removing first commission.")
 
-        building, fundraise = self._get_first_commission()
-        time_delta = self._build(building, fundraise)
+        row = self._get_first_commission()
+        time_delta = self._build(row)
         return time_delta
 
     def _deal_with_unmet_requirements(self, building: str):
         logging.warning('Unmet requirements for building "%s". ' % building)
         els = self.driver.find_elements(By.XPATH, '//*[@id="buildqueue"]/tr[2]/td[2]/span')
         if len(els) > 0:
-            delta_str = els[0].text
-            time_delta = self._str_to_timedelta(delta_str)
+            time_delta = self._str_to_timedelta(els[0].text)
             logging.warning("Waiting until last building is built.")
         else:
             time_delta = self._skip_first_commission()
@@ -265,15 +319,19 @@ class Build(Action):
             self.set_fundraise(
                 self._get_building_cost(building), type(self)
             )
-            waiting_time = None
+            waiting_time = self._get_waiting_time(building, state=LACK_OF_RESOURCES)
         return waiting_time
 
-    def _build(self, building: str, fundraise: Union[str, int, bool]) -> timedelta:
+    def _build(self, row: Tuple[str, Union[str, int, bool], int]) -> timedelta:
+        building, fundraise, max_time = row
         state = self._assert_build(building)
-        waiting_time = self._get_waiting_time(building, state)
 
         if state == CAN_BUILD:
-            self.commission_building(building)
+            if max_time is not None:
+                max_time = self._str_to_timedelta(max_time)
+            waiting_time = self.commission_building(building, max_time)
+        elif state == FULL_QUEUE:
+            waiting_time = self._get_waiting_time(building, state)
         elif state == UNKNOWN_BUILDING:
             logging.warning('Unknown building "%s".' % building)
             waiting_time = self._skip_first_commission()
@@ -283,9 +341,7 @@ class Build(Action):
         elif state == UNMET_REQUIREMENTS:
             waiting_time = self._deal_with_unmet_requirements(building)
         elif state == LACK_OF_RESOURCES:
-            time_delta = self._deal_with_lack_of_resources(building, fundraise)
-            if time_delta is not None:
-                waiting_time = time_delta
+            waiting_time = self._deal_with_lack_of_resources(building, fundraise)
         return waiting_time
 
     def _get_building_cost(self, building: str):

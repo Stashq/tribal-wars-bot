@@ -96,7 +96,7 @@ class Scavenge(Action):
                 delta = datetime.strptime(el.text, "%H:%M:%S")
                 delta = timedelta(hours=delta.hour, minutes=delta.minute, seconds=delta.second)
                 waiting_times += [delta]
-                waiting_times = min(waiting_times)
+            waiting_time = min(waiting_times)
         return waiting_time
 
     def _get_available_troops(self) -> Scavengers:

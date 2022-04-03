@@ -1,10 +1,10 @@
 import csv
+from datetime import datetime, timedelta
 import json
-from multiprocessing.sharedctypes import Value
 from pathlib import Path
 
 from data_types import Scavengers
-from tactics import RecruitTactic, ScavengeTactic, TrainTactic
+from tactics import RecruitTactic, ScavengeTactic, TrainTactic, FarmTactic
 
 
 def file_exists(path: Path):
@@ -35,15 +35,23 @@ def check_build(
     file_exists(path)
     with open(path, "r") as file:
         commissions = list(csv.reader(file))
-    for com_nr, com in enumerate(commissions):
-        assert len(com) == 2, 'Wrong number of arguments in line %d' % com_nr
-        building, fundraise = com
+    for row_nr, row in enumerate(commissions):
+        if len(row) == 2:
+            building, fundraise = row
+            max_time = None
+        elif len(row) == 3:
+            building, fundraise, max_time = row
+        else:
+            raise ValueError('Wrong number of arguments in line %d' % row_nr)
         assert building in [
             "main", "barracks", "stable", "garage", "smith", "statue", "market",
             "wood", "stone", "iron", "farm", "storage", "hide", "wall", "snob"
-        ], 'Unknown building "%s" in line %d.' % (building, com_nr)
+        ], 'Unknown building "%s" in line %d.' % (building, row_nr)
         assert fundraise in [True, False, "True", "False", 1, 0, "1", "0"],\
-            'Unknown fundraise state "%s" in line %d.' % (fundraise, com_nr)
+            'Unknown fundraise state "%s" in line %d.' % (fundraise, row_nr)
+        if max_time is not None:
+            delta = datetime.strptime(max_time, "%H:%M:%S")
+            timedelta(hours=delta.hour, minutes=delta.minute, seconds=delta.second)
     return True
 
 
@@ -125,6 +133,16 @@ def check_train(path: Path = Path('data/train.json')):
         raise ValueError("Bad train.json tactic file.")
 
 
+def check_farm(path: Path = Path('data/farm.json')):
+    file_exists(path)
+    with open(path, "r") as file:
+        tactic = json.load(file)
+    try:
+        FarmTactic(**tactic)
+    except Exception as e:
+        raise ValueError("Bad farm.json tactic file.")
+
+
 def check_all_files():
     check_build_to_prevent()
     check_build()
@@ -133,6 +151,7 @@ def check_all_files():
     check_costs()
     check_scavenge()
     check_train()
+    check_farm()
 
 
 if __name__ == '__main__':
