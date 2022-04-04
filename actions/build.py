@@ -29,7 +29,7 @@ class Build(Action):
         self.commissions = commissions
         self.allow_time_reducing = allow_time_reducing
 
-    def commission_building(self, building: str, max_time: timedelta = None):
+    def _commission_building(self, building: str, max_time: timedelta = None):
         self.sleep()
 
         def commit(y_pos: int) -> bool:
@@ -56,17 +56,22 @@ class Build(Action):
         self._remove_first_commission()
 
         self.sleep()
-        waiting_time = self._get_building_time(pos=-1)
-        while self._if_reduce_time(waiting_time, max_time):
-            self._reduce_time(pos=-1)
+        self._reduce_time(max_time, building)
+        waiting_time = self._get_building_time(0)
+        return waiting_time
+
+    def _reduce_time(self, max_time: timedelta, building: str):
+        time_ = self._get_building_time(pos=-1)
+        while self._if_reduce_time(time_, max_time):
+            self._commit_time_reduction(pos=-1)
 
             self.sleep()
-            old_waiting_time = waiting_time
-            waiting_time = self._get_building_time(pos=-1)
+            old_time_ = time_
+            time_ = self._get_building_time(pos=-1)
             logging.info(
                 'Time of buliding "%s" reduced from %s to %s'\
-                % (building, str(old_waiting_time), str(waiting_time)))
-        return waiting_time
+                % (building, str(old_time_), str(time_)))
+        return time_
 
     def _if_reduce_time(self, waiting_time: timedelta, max_time: timedelta = None) -> bool:
         enough_pp = self._get_pp() > self.pp_limit
@@ -82,7 +87,7 @@ class Build(Action):
         time_delta = self._str_to_timedelta(els[pos].text)
         return time_delta
 
-    def _reduce_time(self, pos: int):
+    def _commit_time_reduction(self, pos: int):
         self.sleep()
         els = self.driver.find_elements(By.XPATH, '//*[@id="buildqueue"]/tr/td[3]/a[1]')
         els[pos].click()
@@ -329,7 +334,7 @@ class Build(Action):
         if state == CAN_BUILD:
             if max_time is not None:
                 max_time = self._str_to_timedelta(max_time)
-            waiting_time = self.commission_building(building, max_time)
+            waiting_time = self._commission_building(building, max_time)
         elif state == FULL_QUEUE:
             waiting_time = self._get_waiting_time(building, state)
         elif state == UNKNOWN_BUILDING:

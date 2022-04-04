@@ -120,6 +120,8 @@ class Farm(Action):
             '//*[@id="command-data-form"]/div[1]/table/tbody/tr[3]/td[2]'
         ).text
         waiting_time = self._str_to_timedelta(text)
+        # consult return time
+        waiting_time = timedelta(seconds=2 * waiting_time.total_seconds())
         if max_time is not None and waiting_time > max_time:
             waiting_time = max_time
         return waiting_time
