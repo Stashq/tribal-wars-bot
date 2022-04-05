@@ -1,0 +1,33 @@
+{
+    "run": false,
+    "type_": "proportions",
+    "savings": {
+        "wood": 7000,
+        "stone": 7000,
+        "iron": 7000
+    },
+    "limits": {
+        "wood": 5000,
+        "stone": 5000,
+        "iron": 5000
+    },
+    "time_delta": "01:45:00",
+    "recruitment": {
+        "barracks": {
+            "spear": 1,
+            "sword": 1,
+            "axe": 0,
+            "archer": 1
+        },
+        "stable": {
+            "spy": 1,
+            "light": 0,
+            "marcher": 0,
+            "heavy": 0
+        },
+        "workshop": {
+            "ram": 0,
+            "catapult": 0
+        }
+    }
+}

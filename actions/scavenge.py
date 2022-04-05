@@ -1,8 +1,8 @@
 from dataclasses import asdict
 from datetime import datetime, timedelta
 import json
-from selenium.webdriver.common.by import By
 from pathlib import Path
+from selenium.webdriver.common.by import By
 from typing import List, Tuple
 
 from actions.base import Action
@@ -24,9 +24,10 @@ int_to_unit_td_parser = {
 class Scavenge(Action):
     def __init__(self, input_: ActionInput):
         super().__init__(input_)
+        self.path = self.base_path / 'scavenge.json'
 
-    def load_tactic(self, path: Path = Path("data/scavenge.json")):
-        with open(path, "r") as file:
+    def load_tactic(self):
+        with open(self.path, "r") as file:
             tactic = json.load(file)
         lvls = self._filter_lvls(tactic["lvls"])
         tactic = ScavengeTactic(
@@ -131,7 +132,7 @@ class Scavenge(Action):
         transported_troops = self._get_transported_troops()
         return available_troops, transported_troops
 
-    def run(self, path: Path = Path("data/scavenge.json"), *args, **kwargs) -> timedelta:
+    def run(self, *args, **kwargs) -> timedelta:
         self.go_to(screen="place", mode="units")
         available_troops, transported_troops = self._get_troops_info()
 
@@ -139,7 +140,7 @@ class Scavenge(Action):
         self.sleep()
         self.driver.execute_script("window.scrollTo(0, 884)")
 
-        st = self.load_tactic(path)
+        st = self.load_tactic()
         troops_per_lvl = st.get_troops_per_lvl(
             available_troops, transported_troops)
         for lvl, troops in troops_per_lvl.items():

@@ -76,8 +76,7 @@ class FarmTactic:
 
     def to_json(
         self,
-        path: Path = Path(
-            "data/farm.json")
+        path: Path
     ):
         with open(path, "w") as file:
             json.dump(asdict(self), file)

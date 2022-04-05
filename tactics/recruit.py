@@ -37,8 +37,7 @@ class RecruitTactic:
 
     def to_json(
         self,
-        path: Path = Path(
-            "data/recruit_to_prevent.json")
+        path: Path
     ):
         # self.time_delta = datetime.strftime(
         #     self.time_delta, "%H:%M:%S"

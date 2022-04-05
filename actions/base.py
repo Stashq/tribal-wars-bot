@@ -1,13 +1,14 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
+from furl import furl
 import logging
 import numpy as np
 import re
+from pathlib import Path
 from selenium.webdriver.common.by import By
 import time
 from typing import Union, Type
-from furl import furl
 
 from actions.action_input import ActionInput
 from data_types import Cost
@@ -16,9 +17,10 @@ from data_types import Cost
 class Action(ABC):
     def __init__(self, input_: ActionInput):
         self.driver = input_.driver
-        self.base_url = 'https://pl%d.plemiona.pl/game.php?village=%d' % (input_.world_nr, input_.village_nr)
+        self.current_village_url = input_.current_village_url
         self.fundraise = input_.fundraise
         self.pp_limit = input_.pp_limit
+        self.base_path = Path('villages_commissions/' + input_.village_coordinates)
 
     def sleep(self, mu: float = 1.345, sig: float = 0.35):
         rand = np.random.randn()
@@ -28,8 +30,9 @@ class Action(ABC):
 
     def go_to(self, screen: str, mode: str = None):
         self.sleep()
-        url = self.base_url + '&screen=' + screen
-        self.driver.get(url)
+        url = furl(self.current_village_url)
+        url.args['screen'] = screen
+        self.driver.get(url.url)
 
         if mode is not None:
             self.change_mode(mode)

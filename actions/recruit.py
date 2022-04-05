@@ -15,16 +15,18 @@ from tactics.recruit import RecruitTactic
 class Recruit(Action):
     def __init__(self, input_: ActionInput):
         super().__init__(input_)
+        self.path = self.base_path / 'recruit.json'
+        self.lowering_recources_path = self.base_path / 'recruit_to_prevent.json'
         self.costs = self._load_costs()
 
-    def _load_costs(self, path: Path = Path("data/costs.json")) -> List[Cost]:
-        with open(path, "r") as file:
+    def _load_costs(self) -> List[Cost]:
+        with open('data/costs.json', "r") as file:
             costs = json.load(file)
         costs = {unit: Cost(**cost) for unit, cost in costs.items()}
         return costs
 
     def _load_recruit_tactic(
-        self, path: Path = Path("data/recruit_proportions.json")
+        self, path: Path
     ) -> RecruitTactic:
         with open(path, "r") as file:
             rt = json.load(file)
@@ -89,17 +91,13 @@ class Recruit(Action):
             res = rt.recruitment
         return res
 
-    def run(
-        self,
-        path: Path = Path("data/recruit.json"),
-        lowering_recources_path: Path = Path("data/recruit_to_lower_resources.json")
-    ) -> timedelta:
-        if lowering_recources_path.is_file():
-            rt = self._load_recruit_tactic(lowering_recources_path)
+    def run(self) -> timedelta:
+        if self.lowering_recources_path.is_file():
+            rt = self._load_recruit_tactic(self.lowering_recources_path)
             self.recruit(rt)
-            lowering_recources_path.unlink()  # removes file
+            self.lowering_recources_path.unlink()  # removes file
 
-        rt = self._load_recruit_tactic(path)
+        rt = self._load_recruit_tactic(self.path)
         self.recruit(rt)
 
         return rt.time_delta

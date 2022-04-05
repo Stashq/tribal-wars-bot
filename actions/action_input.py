@@ -8,8 +8,8 @@ from data_types import Cost
 @dataclass
 class ActionInput:
     driver: Chrome
-    world_nr: int
-    village_nr: int
+    current_village_url: str
+    village_coordinates: str
     fundraise: Dict = field(
         default_factory=lambda: {"cost": Cost(), "action": None})
     pp_limit: int = 9999999

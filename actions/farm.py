@@ -1,7 +1,6 @@
 from dataclasses import fields
 from datetime import timedelta
 import json
-from pathlib import Path
 from selenium.webdriver.common.by import By
 from typing import Dict, Union
 
@@ -15,6 +14,8 @@ from tactics.farm import FarmCommission
 class Farm(Action):
     def __init__(self, input_: ActionInput, com_id: str = None):
         super().__init__(input_)
+
+        self.path = self.base_path / 'farm.json'
         self.com_id = com_id
         self.fs = self._read_farm_file()
         self.next_attempt = timedelta(hours=2)
@@ -61,8 +62,8 @@ class Farm(Action):
             waiting_times[com.id_] = self._run_commission(com)
         return waiting_times
 
-    def _read_farm_file(self, path: Path = Path('data/farm.json')):
-        with open(path, 'r') as file:
+    def _read_farm_file(self):
+        with open(self.path, 'r') as file:
             fs = json.load(file)
         fs = FarmTactic(**fs)
         return fs
@@ -107,7 +108,7 @@ class Farm(Action):
             By.XPATH, '//*[@id="place_target"]/input'
         ).send_keys('%d|%d' % (x, y))
 
-        self.sleep(0.5)
+        self.sleep()
         # click on 'attack' to go to next page
         self.driver.find_element(
             By.XPATH, '//*[@id="target_attack"]'
@@ -121,7 +122,7 @@ class Farm(Action):
         ).text
         waiting_time = self._str_to_timedelta(text)
         # consult return time
-        waiting_time = timedelta(seconds=2 * waiting_time.total_seconds())
+        waiting_time = timedelta(seconds=2 * waiting_time.total_seconds() + 60)
         if max_time is not None and waiting_time > max_time:
             waiting_time = max_time
         return waiting_time

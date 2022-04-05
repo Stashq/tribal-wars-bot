@@ -12,7 +12,8 @@ class Train(Action):
     def __init__(self, input_: ActionInput):
         super().__init__(input_)
         self.in_training_panel = False
-        with open("data/train.json", "r") as file:
+        self.path = self.base_path / 'train.json'
+        with open(self.path, "r") as file:
             self.settings = json.load(file)
         self.time_after_attempt = timedelta(
             minutes=self.settings["minutes_after_attempt"])

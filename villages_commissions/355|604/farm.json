@@ -1,0 +1,16 @@
+{
+    "run": false,
+    "commissions": [
+        {
+            "id_": "zdobywanie_wioski(355|604)",
+            "troops": {
+                "spear": 100, "sword": 100, "spy": 1, "snob": 1
+            },
+            "x": 355,
+            "y": 604,
+            "next_attempt": "02:54:00",
+            "send_incomplete": false
+        }
+    ],
+    "except_": {}
+}

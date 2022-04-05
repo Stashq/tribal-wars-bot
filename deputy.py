@@ -4,27 +4,24 @@ from dotenv import dotenv_values
 import time
 import numpy as np
 import traceback
-from typing import Union, Type
 from selenium.webdriver.chrome.service import Service
 from selenium.common.exceptions import NoSuchElementException
 from webdriver_manager.chrome import ChromeDriverManager
-from datetime import datetime, timedelta
+from datetime import datetime
 import logging
+import pause
 from selenium.webdriver.remote.command import Command
-from typing import Tuple, Dict
+import os
 
-from actions import Scavenge, ActionInput, Action, Train, Build, Recruit, Farm, Prevent
-from check_data import check_all_files
-from data_types import Cost
-from scheduler import Scheduler
+from check_data import FilesChecker
+from village_caretaker import VillageCaretaker
 
 
-class Bot:
+class Deputy:
     def __init__(
         self,
         world_nr: int = 175,
         safe_mode: bool = True,
-        prevent: bool = True,
         allow_time_reducing = False,
         pp_limit: int = 9999999
     ):
@@ -34,15 +31,34 @@ class Bot:
             level=logging.INFO
         )
         self.driver = None
-        self.current_village_url = None
-        self.fundraise = {"cost": Cost(), "action": None}
         self.world_nr = world_nr
-        self.scheduler = Scheduler()
         self.safe_mode = safe_mode
-        self.attempt_break = timedelta(hours=1)
-        self.prevent = prevent
         self.allow_time_reducing = allow_time_reducing
         self.pp_limit = pp_limit
+        self.village_caretakers = self.create_village_caretakers()
+
+    def create_village_caretakers(self):
+        villages = self.get_declared_villages()
+        res = [
+            VillageCaretaker(
+                driver=self.driver,
+                village_coordinates=v_cor,
+                base_url='https://pl%d.plemiona.pl/game.php?screen=overview_villages' % self.world_nr,
+                safe_mode=self.safe_mode,
+                pp_limit=self.pp_limit
+            )
+            for v_cor in villages
+        ]
+        return res
+
+    def get_declared_villages(self):
+        villages = os.listdir('villages_commissions')
+        villages = list(filter(
+            lambda v: 
+                os.path.isdir('villages_commissions/' + v),
+            villages
+        ))
+        return villages
 
     def init_driver(self):
         options = webdriver.ChromeOptions()
@@ -65,6 +81,7 @@ class Bot:
         self.driver.execute_cdp_cmd('Network.setUserAgentOverride', {"userAgent":
             'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36'})
         self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        return self.driver
 
     def sleep(self, mu: float = 1.345, sig: float = 0.35):
         rand = np.random.randn()
@@ -88,7 +105,6 @@ class Bot:
 
         self.choose_world(world_nr)
         time.sleep(2)
-        self.current_village_url = self.driver.current_url
 
     def choose_world(self, world_nr: int = 175):
         # url = '/page/play/pl' + str(world_nr)
@@ -98,99 +114,38 @@ class Bot:
         self.driver.find_element(By.XPATH, '//*[@id="home"]/div[3]/div[4]/div[10]/div[3]/div[2]/div[1]/a/span')\
             .click()
 
-    def setup_next_visit_time(
-        self,
-        action: Action,
-        action_res: Union[timedelta, Tuple[timedelta, str], Dict[str, timedelta]],
-    ):
-        self.scheduler.set_waiting_time(action, action_res)
-
     def quit_session(self):
         self.sleep(2)
         self.driver.quit()
-        self.scheduler.log_times()
         logging.info("Driver quited session.")
 
-    def run_rutines(self):
-        if self.prevent:
-            self.run_action(Prevent)
-
-        if self.scheduler.train is None:
-            self.run_action(Train)
-        if self.scheduler.build is None:
-            self.run_action(
-                Build,
-                allow_time_reducing=self.allow_time_reducing)
-        if self.scheduler.scavenge is None:
-            self.run_action(Scavenge)
-        if self.scheduler.recruit is None:
-            self.run_action(Recruit)
-        if self.scheduler.farm is None:
-            self.run_action(Farm)
-
     def run_cycle(self):
-        Action_, com_id = self.scheduler.wait()
-        kwargs = self.get_action_kwargs(Action_, com_id)
+        vc = self.wait()
         self.init_driver()
         self.login(world_nr=175)
-        self.run_action(Action_, **kwargs)
-        self.run_rutines()
+        vc.run(self.driver)
         self.quit_session()
 
-    def get_action_kwargs(self, Action_: Type[Action], com_id: str) -> Tuple[Tuple, Dict]:
-        kwargs = {}
-        if Action_ == Build:
-            kwargs['allow_time_reducing'] = self.allow_time_reducing
-        if com_id is not None:
-            kwargs['com_id'] = com_id
-        return kwargs
+    def wait(self) -> VillageCaretaker:
+        vc = self.get_first_village_caretaker()
+        logging.info("Waiting until %s." % vc.next_time.strftime("%Y-%m-%d, %H:%M:%S"))
+        pause.until(vc.next_time)
+        return vc
+
+    def get_first_village_caretaker(self) -> VillageCaretaker:
+        first_vc = self.village_caretakers[0]
+        for vc in self.village_caretakers[1:]:
+            if vc.next_time < first_vc.next_time:
+                first_vc = vc
+        return vc
 
     def first_run(self):
-        check_all_files()
+        FilesChecker().check_all_files()
         self.init_driver()
         self.login(world_nr=175)
-        self.run_rutines()
+        for vc in self.village_caretakers:
+            vc.run(self.driver)
         self.quit_session()
-
-    def _deal_with_action_exception(self, e: Exception):
-        if not self.safe_mode:
-            raise e
-        self.log_error(e)
-        print("Continue running program...")
-        time_ = self.attempt_break
-        logging.info("Next attempt in " + str(time_))
-        return time_
-
-    def run_action(self, Action_cls: Type[Action], *args, **kwargs):
-        ai = ActionInput(
-            driver=self.driver,
-            world_nr=self.world_nr,
-            village_nr=175,
-            fundraise=self.fundraise,
-            pp_limit=self.pp_limit
-        )
-        action = Action_cls(ai, *args, **kwargs)
-        try:
-            res = action.run()
-        except Exception as e:
-            res = self._deal_with_action_exception(e)
-            res = (res, kwargs.get('com_id'))
-        if res is not None:
-            self.setup_next_visit_time(action, res)
-        if self.fundraise["action"] == Action_cls:
-            self._reset_fundraise()
-
-    def _parse_action_res(self, res) -> Tuple[timedelta, str]:
-        try:
-            time_, com_id = res
-        except:
-            time_ = res
-            com_id = None
-        return time_, com_id
-
-    def _reset_fundraise(self):
-        self.fundraise["cost"] = Cost()
-        self.fundraise["action"] = None
 
     def log_error(self, e: Exception):
         logging.error("Error! [x]")

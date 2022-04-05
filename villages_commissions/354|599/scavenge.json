@@ -3,9 +3,8 @@
     "lvls": [2, 3, 4],
     "except_":
     {
-        "spear": 100,
-        "sword": 100,
-        "light": "all",
+        "spear": 500,
+        "sword": "all",
         "knight": "all"
     }
 }

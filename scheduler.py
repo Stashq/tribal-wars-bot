@@ -84,7 +84,9 @@ class Scheduler:
         action_res: Union[timedelta, Tuple[timedelta, str], Dict[str, timedelta]]
     ):
         cmd = self._action_to_str(action)
-        if isinstance(action_res, timedelta):
+        if isinstance(action_res, datetime):
+            setattr(self, cmd, action_res)
+        elif isinstance(action_res, timedelta):
             time_ = datetime.now() + action_res
             setattr(self, cmd, time_)
         elif isinstance(action_res, Tuple):

@@ -1,5 +1,3 @@
-import csv
-from datetime import datetime, timedelta
 import json
 import logging
 from pathlib import Path
@@ -14,6 +12,8 @@ from tactics import PreventTactic, RecruitTactic
 class Prevent(Action):
     def __init__(self, input_: ActionInput):
         super().__init__(input_)
+        self.path = Path('data/prevent.json')
+        self.build_to_prevent_path = self.base_path / 'build_to_prevent.json'
 
     def run(self):
         overflow = dict(
@@ -31,9 +31,9 @@ class Prevent(Action):
         return None
 
     def _deal_with_overpopulation(
-        self, overflow: dict, path: Path = Path("data/build_to_prevent.json")
+        self, overflow: dict
     ):
-        with open(path, "r") as file:
+        with open(self.build_to_prevent_path, "r") as file:
             build_order = json.load(file)
         if build_order['farm_in_process'] not in ["1", "True", 1, True]:
             build_order["farm"] = True
@@ -45,7 +45,7 @@ class Prevent(Action):
                 text = "Overpopulation and resources overflow. Commission storage at first and farm at second building."
             logging.warning(text)
 
-            with open(path, "w") as file:
+            with open(self.build_to_prevent_path, "w") as file:
                 json.dump(build_order, file)
 
     def _deal_with_resources_overflow(self, overflow: dict):
@@ -56,7 +56,7 @@ class Prevent(Action):
             run=True, type_="proportions", limits=Cost(*[size]*3),
             recruitment=rec#, time_delta=timedelta
         )
-        rt.to_json()
+        rt.to_json(self.base_path / 'recruit_to_prevent.json')
         logging.warning("Resources overflow. Recruit commissioned.")
 
     def _select_recruitment(self, overflow: Dict[str, bool], pt: PreventTactic) -> Recruitment:
@@ -76,8 +76,8 @@ class Prevent(Action):
             res = pt.iron
         return res
 
-    def _load_prevent_tactic(self, path: Path = Path("data/prevent.json")):
-        with open(path, "r") as file:
+    def _load_prevent_tactic(self):
+        with open(self.path, "r") as file:
             prevention = json.load(file)
         pt = PreventTactic(**prevention)
         return pt

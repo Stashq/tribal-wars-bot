@@ -2,7 +2,6 @@ import csv
 from datetime import datetime, timedelta
 import json
 import logging
-from pathlib import Path
 import re
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
@@ -15,16 +14,17 @@ from data_types import Cost
 (CAN_BUILD, FULL_QUEUE, LACK_OF_RESOURCES,\
     UNMET_REQUIREMENTS, UNKNOWN_BUILDING, FULLY_DEVELOPED) = tuple(range(6))
 
+
 class Build(Action):
     def __init__(
         self,
         input_: ActionInput,
-        path: Path = Path("data/build.csv"),
         allow_time_reducing: bool = False
     ):
         super().__init__(input_)
-        self.path = path
-        with open(path, "r") as file:
+        self.path = self.base_path / 'build.csv'
+        self.build_to_prevent_path = self.base_path / 'build_to_prevent.json'
+        with open(self.path, "r") as file:
             commissions = list(csv.reader(file))
         self.commissions = commissions
         self.allow_time_reducing = allow_time_reducing
@@ -250,15 +250,15 @@ class Build(Action):
         return waiting_time
 
     def _build_priorities(
-        self, path: Path = Path("data/build_to_prevent.json")
+        self
     ):
-        with open(path, "r") as file:
+        with open(self.build_to_prevent_path, "r") as file:
             priorities_order = json.load(file)
 
         self._build_priority(priorities_order, "farm")
         self._build_priority(priorities_order, "storage")
 
-        with open(path, "w") as file:
+        with open(self.build_to_prevent_path, "w") as file:
             json.dump(priorities_order, file)
 
     def _build_priority(self, priorities_order: dict, building: Literal["farm", "storage"]):
