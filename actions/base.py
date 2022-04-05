@@ -20,6 +20,7 @@ class Action(ABC):
         self.current_village_url = input_.current_village_url
         self.fundraise = input_.fundraise
         self.pp_limit = input_.pp_limit
+        self.village_coordinates = input_.village_coordinates
         self.base_path = Path('villages_commissions/' + input_.village_coordinates)
 
     def sleep(self, mu: float = 1.345, sig: float = 0.35):
@@ -27,6 +28,9 @@ class Action(ABC):
         time.sleep(
             abs(rand*sig + mu)
         )
+
+    def log(self, text: str, lvl: int = logging.INFO):
+        logging.log(lvl, '(%s) : %s' % (self.village_coordinates, text))
 
     def go_to(self, screen: str, mode: str = None):
         self.sleep()

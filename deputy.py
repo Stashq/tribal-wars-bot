@@ -117,7 +117,7 @@ class Deputy:
     def quit_session(self):
         self.sleep(2)
         self.driver.quit()
-        logging.info("Driver quited session.")
+        self.log("Driver quited session.")
 
     def run_cycle(self):
         vc = self.wait()
@@ -126,9 +126,31 @@ class Deputy:
         vc.run(self.driver)
         self.quit_session()
 
+    def set_logging(self, who: str = ''):
+        # TODO: modify to make it work
+        logging.basicConfig(
+            filename='bot_run.log',
+            format='%(asctime)s ' + who + ': %(message)s',
+            level=logging.INFO
+        )
+
+    def log_error(self, e: Exception):
+        self.log("Error! [x]", logging.ERROR)
+        logging.exception(e)
+        traceback.print_exc()
+        if self._driver_is_alive():
+            self.driver.save_screenshot(
+                "error_screenshots/" + datetime.now().strftime("%Y-%m-%d, %H:%M:%S"))
+            self.log("Screenshot took.", logging.WARN)
+        else:
+            self.log("Driver is dead.", logging.WARN)
+
+    def log(self, text: str, lvl: int = logging.INFO):
+        logging.log(lvl, text)
+
     def wait(self) -> VillageCaretaker:
         vc = self.get_first_village_caretaker()
-        logging.info("Waiting until %s." % vc.next_time.strftime("%Y-%m-%d, %H:%M:%S"))
+        self.log("Waiting until %s." % vc.next_time.strftime("%Y-%m-%d, %H:%M:%S"))
         pause.until(vc.next_time)
         return vc
 
@@ -147,17 +169,6 @@ class Deputy:
             vc.run(self.driver)
         self.quit_session()
 
-    def log_error(self, e: Exception):
-        logging.error("Error! [x]")
-        logging.exception(e)
-        traceback.print_exc()
-        if self._driver_is_alive():
-            self.driver.save_screenshot(
-                "error_screenshots/" + datetime.now().strftime("%Y-%m-%d, %H:%M:%S"))
-            logging.warning("Screenshot took.")
-        else:
-            logging.warning("Driver is dead.")
-
     def _driver_is_alive(self) -> bool:
         try:
             self.driver.execute(Command.STATUS)
@@ -169,10 +180,10 @@ class Deputy:
     def quit_run(self):
         if self._driver_is_alive():
             self.quit_session()
-        logging.info("Bot ends.")
+        self.log("Bot ends.")
 
     def run(self):
-        logging.info("====== New session ======")
+        self.log("====== New session ======")
         try:
             self.first_run()
             while True:
@@ -182,6 +193,6 @@ class Deputy:
                 raise e
             self.log_error(e)
         except KeyboardInterrupt:
-            logging.info("Keyboard interrupt.")
+            self.log("Keyboard interrupt.")
         finally:
             self.quit_run()

@@ -156,6 +156,7 @@ class VillageCaretaker:
             self.run_action(Action_cls, **action_kwargs)
         self.run_rutines()
         self.set_next_task()
+        self.scheduler.log_times()
         return self.next_time
 
     def _go_to_village(self):

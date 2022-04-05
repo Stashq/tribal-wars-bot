@@ -8,7 +8,7 @@ recruit_proportions.json
 priorities.csv
 tmp.ipynb
 error_screenshots
-data/*
+villages_commissions/*
 
 __pycache__
 .vscode

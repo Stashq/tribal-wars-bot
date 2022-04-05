@@ -1,0 +1,1 @@
+{"recruitment": {"barracks": {"spear": 0, "sword": 3, "axe": 0, "archer": 0}, "stable": {"spy": 0, "light": 1, "marcher": 0, "heavy": 0}, "workshop": {"ram": 0, "catapult": 0}}, "run": true, "type_": "proportions", "savings": {"wood": 0, "stone": 0, "iron": 0}, "limits": {"wood": 2217, "stone": 2217, "iron": 2217}, "time_delta": null}
