@@ -68,7 +68,7 @@ class Build(Action):
             self.sleep()
             old_time_ = time_
             time_ = self._get_building_time(pos=-1)
-            logging.info(
+            self.log(
                 'Time of buliding "%s" reduced from %s to %s'\
                 % (building, str(old_time_), str(time_)))
         return time_
@@ -299,18 +299,20 @@ class Build(Action):
 
     def _skip_first_commission(self):
         self._remove_first_commission()
-        logging.warning("Removing first commission.")
+        self.log("Removing first commission.", logging.WARN)
 
         row = self._get_first_commission()
         time_delta = self._build(row)
         return time_delta
 
     def _deal_with_unmet_requirements(self, building: str):
-        logging.warning('Unmet requirements for building "%s". ' % building)
+        self.log(
+            'Unmet requirements for building "%s". ' % building,
+            logging.WARN)
         els = self.driver.find_elements(By.XPATH, '//*[@id="buildqueue"]/tr[2]/td[2]/span')
         if len(els) > 0:
             time_delta = self._str_to_timedelta(els[0].text)
-            logging.warning("Waiting until last building is built.")
+            self.log("Waiting until last building is built.", logging.WARN)
         else:
             time_delta = self._skip_first_commission()
         return time_delta
@@ -338,10 +340,10 @@ class Build(Action):
         elif state == FULL_QUEUE:
             waiting_time = self._get_waiting_time(building, state)
         elif state == UNKNOWN_BUILDING:
-            logging.warning('Unknown building "%s".' % building)
+            self.log('Unknown building "%s".' % building, logging.WARN)
             waiting_time = self._skip_first_commission()
         elif state == FULLY_DEVELOPED:
-            logging.warning('Building "%s" is fully developed.' % building)
+            self.log('Building "%s" is fully developed.' % building, logging.WARN)
             waiting_time = self._skip_first_commission()
         elif state == UNMET_REQUIREMENTS:
             waiting_time = self._deal_with_unmet_requirements(building)

@@ -1,18 +1,21 @@
-from selenium import webdriver
-from selenium.webdriver.common.by import By
 from dotenv import dotenv_values
-import time
-import numpy as np
-import traceback
-from selenium.webdriver.chrome.service import Service
-from selenium.common.exceptions import NoSuchElementException
-from webdriver_manager.chrome import ChromeDriverManager
 from datetime import datetime
+import inspect
 import logging
-import pause
-from selenium.webdriver.remote.command import Command
+import numpy as np
 import os
+import pause
+from selenium import webdriver
+from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from selenium.webdriver.remote.command import Command
+import time
+import traceback
+from typing import Union, Type
+from webdriver_manager.chrome import ChromeDriverManager
 
+from actions import Action, Build, Farm, Recruit, Scavenge, Train
 from check_data import FilesChecker
 from village_caretaker import VillageCaretaker
 
@@ -126,14 +129,6 @@ class Deputy:
         vc.run(self.driver)
         self.quit_session()
 
-    def set_logging(self, who: str = ''):
-        # TODO: modify to make it work
-        logging.basicConfig(
-            filename='bot_run.log',
-            format='%(asctime)s ' + who + ': %(message)s',
-            level=logging.INFO
-        )
-
     def log_error(self, e: Exception):
         self.log("Error! [x]", logging.ERROR)
         logging.exception(e)
@@ -148,9 +143,31 @@ class Deputy:
     def log(self, text: str, lvl: int = logging.INFO):
         logging.log(lvl, text)
 
+    def _action_to_str(self, action: Union[Action, Type[Action]]) -> str:
+        if inspect.isclass(action):
+            action_type = action
+        else:
+            action_type = type(action)
+        if action_type == Build:
+            cmd = "build"
+        elif action_type == Farm:
+            cmd = "farm"
+        elif action_type == Recruit:
+            cmd = "recruit"
+        elif action_type == Scavenge:
+            cmd = "scavenge"
+        elif action_type == Train:
+            cmd = "train"
+        else:
+            raise ValueError('Unknown action "%s"' % str(action_type))
+        return cmd
+
     def wait(self) -> VillageCaretaker:
         vc = self.get_first_village_caretaker()
-        self.log("Waiting until %s." % vc.next_time.strftime("%Y-%m-%d, %H:%M:%S"))
+        self.log('Next run: (%s) %s %s.' % (
+            vc.village_coordinates,
+            self._action_to_str(vc.next_action),
+            vc.next_time.strftime("%Y-%m-%d, %H:%M:%S")))
         pause.until(vc.next_time)
         return vc
 

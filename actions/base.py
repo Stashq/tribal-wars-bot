@@ -50,7 +50,7 @@ class Action(ABC):
         els = self.driver.find_elements(By.XPATH, '//div[@class="content" and text()="Niewłaściwy tryb"]')
         if len(els) > 0:
             msg = 'Invalid mode "%s". Url: %s.' % (mode, url)
-            logging.error(msg)
+            self.log(msg, logging.ERROR)
             raise ValueError(msg)
 
     def get_resources(self, deduct_fundraise: bool = True) -> Cost:
@@ -113,14 +113,17 @@ class Action(ABC):
     def log_next_attempt_warning(self, cmd: str, td: timedelta) -> timedelta:
         next_attempt = datetime.now() + timedelta(hours=1)
         next_attempt_str = next_attempt.strftime("%Y-%m-%d, %H:%M:%S")
-        logging.warning("Cannot %s. Next attempt at %s." % (cmd, next_attempt_str))
+        self.log(
+            "Cannot %s. Next attempt at %s." % (cmd, next_attempt_str),
+            logging.WARN
+        )
 
     def set_fundraise(self, cost: Cost, action: Type[Action]):
         self.fundraise["cost"].wood = cost.wood
         self.fundraise["cost"].stone = cost.stone
         self.fundraise["cost"].iron = cost.iron
         self.fundraise["action"] = action
-        logging.info(
+        self.log(
             "Set fundraise: wood %d, stone %d, iron %d." % (cost.wood, cost.stone, cost.iron)
         )
 

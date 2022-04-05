@@ -78,6 +78,25 @@ class Scheduler:
             raise ValueError('Unknown action "%s"' % cmd)
         return action_class
 
+    def _action_to_str(self, action: Union[Action, Type[Action]]) -> str:
+        if inspect.isclass(action):
+            action_type = action
+        else:
+            action_type = type(action)
+        if action_type == Build:
+            cmd = "build"
+        elif action_type == Farm:
+            cmd = "farm"
+        elif action_type == Recruit:
+            cmd = "recruit"
+        elif action_type == Scavenge:
+            cmd = "scavenge"
+        elif action_type == Train:
+            cmd = "train"
+        else:
+            raise ValueError('Unknown action "%s"' % str(action_type))
+        return cmd
+
     def set_waiting_time(
         self,
         action: Action,
@@ -100,25 +119,6 @@ class Scheduler:
         else:
             raise ValueError('Unknown type of action response: %s.' % str(action_res))
 
-    def _action_to_str(self, action: Union[Action, Type[Action]]) -> str:
-        if inspect.isclass(action):
-            action_type = action
-        else:
-            action_type = type(action)
-        if action_type == Build:
-            cmd = "build"
-        elif action_type == Farm:
-            cmd = "farm"
-        elif action_type == Recruit:
-            cmd = "recruit"
-        elif action_type == Scavenge:
-            cmd = "scavenge"
-        elif action_type == Train:
-            cmd = "train"
-        else:
-            raise ValueError('Unknown action "%s"' % str(action_type))
-        return cmd
-
     def reset_waiting_time(self, action: Action):
         cmd = self._action_to_str(action)
         setattr(self, cmd, None)
@@ -130,15 +130,15 @@ class Scheduler:
         self.reset_waiting_time(Action_)
         return Action_, com_id
 
-    def log_times(self):
-        text = "Times set to: "
+    def log_times(self, village_coordinates: str = ''):
+        text = '(%s) saved times:' % village_coordinates
         for name, time_ in asdict(self).items():
             if isinstance(time_, dict):
                 time_ = min(time_.values())
-            text += name + " "
+            text += '\n\t%s:' % name
+            text += ' '*(10-len(name))
             if time_ is not None:
-                text += datetime.strftime(time_, "%Y-%m-%d, %H:%M:%S") + ", "
+                text += datetime.strftime(time_, "%Y-%m-%d %H:%M:%S")
             else:
-                text += "None, "
-        text = text[:-2]
+                text += "---------- --:--:--"
         logging.info(text)

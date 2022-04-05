@@ -69,14 +69,14 @@ class Train(Action):
                 By.XPATH, '//*[@id="popup_box_knight_regimens"]/div/div[2]/div[6]/a[1][text()="Start"]'
             ).click()
             self.in_training_panel = False
-            logging.info("Knight training started.")
+            self.log("Knight training started.")
         else:
             time_delta = self.time_after_attempt
             self.set_fundraise(
                 cost=self._get_training_cost(),
                 action=type(self)
             )
-            logging.info("Not enough resources for knight training.")
+            self.log("Not enough resources for knight training.")
         return time_delta
 
     def _get_waiting_time(self) -> timedelta:

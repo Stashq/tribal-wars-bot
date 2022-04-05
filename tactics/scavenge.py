@@ -79,7 +79,7 @@ class ScavengeTactic:
                 troops=available_troops, subtrahend=current_troops)
             result[lvl] = adjusted_lvl_troops
             if adjusted_lvl_troops != current_troops:
-                logging.warning("Not enough troops for scavenging on lvl %d." % lvl)
+                self.log("Not enough troops for scavenging on lvl %d." % lvl, logging.WARN)
         return result
 
     def _troops_are_empty(self, troops: Scavengers) -> bool:

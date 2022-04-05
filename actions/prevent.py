@@ -43,7 +43,7 @@ class Prevent(Action):
                     and build_order['storage_in_process'] not in ["1", "True", 1, True]:
                 build_order["storage"] = True
                 text = "Overpopulation and resources overflow. Commission storage at first and farm at second building."
-            logging.warning(text)
+            self.log(text, logging.WARN)
 
             with open(self.build_to_prevent_path, "w") as file:
                 json.dump(build_order, file)
@@ -57,7 +57,7 @@ class Prevent(Action):
             recruitment=rec#, time_delta=timedelta
         )
         rt.to_json(self.base_path / 'recruit_to_prevent.json')
-        logging.warning("Resources overflow. Recruit commissioned.")
+        self.log("Resources overflow. Recruit commissioned.", logging.WARN)
 
     def _select_recruitment(self, overflow: Dict[str, bool], pt: PreventTactic) -> Recruitment:
         if overflow["wood"] and overflow["stone"] and overflow["iron"]:
@@ -89,10 +89,10 @@ class Prevent(Action):
         if type_ == "res" or type_ == '':
             res = False
         elif type_ == "warn_90":
-            logging.warning('Resource with ID "%s" exceed 90%%.' % id_)
+            self.log('Resource with ID "%s" exceed 90%%.' % id_, logging.WARN)
             res = True
         elif type_ == "warn":
-            logging.warning('No space for resource with ID "%s".' % id_)
+            self.log('No space for resource with ID "%s".' % id_, logging.WARN)
             res = True
         return res
 

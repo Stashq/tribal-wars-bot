@@ -135,14 +135,14 @@ class Recruit(Action):
                 self._write_unit_number(unit, amount)
         self.sleep()
         self.driver.find_element(By.XPATH, "//input[@value='Rekrutacja']").click()
-        logging.info('Recruited: %s' % str(units))
+        self.log('Recruited: %s' % str(units))
 
     def _write_unit_number(self, unit: str, amount: int):
         self.sleep()
         try:
             self.driver.find_element(By.CSS_SELECTOR, '#' + unit + '_0').send_keys(str(amount))
         except Exception as e:
-            logging.warning("Cannot recruit %s" % unit)
+            self.log("Cannot recruit %s" % unit, logging.WARN)
 
     def _get_waiting_time(self, recruit_tactic: RecruitTactic) -> timedelta:
         return recruit_tactic.next_time
