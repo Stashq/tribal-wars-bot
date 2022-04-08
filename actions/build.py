@@ -1,4 +1,5 @@
 import csv
+from curses.ascii import CAN
 from datetime import datetime, timedelta
 import json
 import logging
@@ -11,8 +12,8 @@ from actions.base import Action
 from actions.action_input import ActionInput
 from data_types import Cost
 
-(CAN_BUILD, FULL_QUEUE, LACK_OF_RESOURCES,\
-    UNMET_REQUIREMENTS, UNKNOWN_BUILDING, FULLY_DEVELOPED) = tuple(range(6))
+(CAN_BUILD, FULL_QUEUE, LACK_OF_RESOURCES, LACK_OF_VILLAGERS,\
+    UNMET_REQUIREMENTS, UNKNOWN_BUILDING, FULLY_DEVELOPED) = tuple(range(7))
 
 
 class Build(Action):
@@ -120,17 +121,24 @@ class Build(Action):
         )
         return len(els) > 0
 
-    def _full_queue(self, building: str):
-        full_queue_elements = self.driver.find_elements(
+    def _queue_is_full(self):
+        els = self.driver.find_elements(
             By.XPATH,
-            '//*[@id="main_buildrow_%s"]/td[7]/span[text()="Kolejka jest obecnie pełna"]' % building
+            '//*[@id="buildqueue"]/tr'
         )
-        return len(full_queue_elements) > 0
+        return len(els) == 4
 
     def _lack_of_resources(self, building: str):
         lack_of_resources_elements = self.driver.find_elements(
             By.XPATH,
             '//*[@id="main_buildrow_%s"]/td[7]/div[contains(text(), "Surowce dostępne")]' % building
+        )
+        return len(lack_of_resources_elements) > 0
+
+    def _lack_of_villagers(self, building: str) -> bool:
+        lack_of_resources_elements = self.driver.find_elements(
+            By.XPATH,
+            '//*[@id="main_buildrow_%s"]/td[7]/div[contains(text(), "Zagroda za mała")]' % building
         )
         return len(lack_of_resources_elements) > 0
 
@@ -164,10 +172,12 @@ class Build(Action):
     def _assert_build(self, building: str) -> int:
         if self._can_build(building):
             return CAN_BUILD
-        elif self._full_queue(building):
+        elif self._queue_is_full():
             return FULL_QUEUE
         elif self._lack_of_resources(building):
             return LACK_OF_RESOURCES
+        elif self._lack_of_villagers(building):
+            return LACK_OF_VILLAGERS
         elif self._unmet_requirements(building):
             return UNMET_REQUIREMENTS
         elif self._unknown_building(building):
@@ -178,13 +188,13 @@ class Build(Action):
             self._raise_unknown_limitation_error(building)
 
     def _get_waiting_time(self, building: str, state: int) -> timedelta:
-        if state == CAN_BUILD:
-            delta = self.driver.find_element(
-                By.XPATH,
-                '//*[@id="main_buildrow_%s"]/td[5]' % building
-            ).text
-            waiting_time = self._str_to_timedelta(delta)
-        elif state == FULL_QUEUE or state == UNMET_REQUIREMENTS:
+        # if state == CAN_BUILD:
+        #     delta = self.driver.find_element(
+        #         By.XPATH,
+        #         '//*[@id="main_buildrow_%s"]/td[5]' % building
+        #     ).text
+        #     waiting_time = self._str_to_timedelta(delta)
+        if state == CAN_BUILD or state == FULL_QUEUE or state == UNMET_REQUIREMENTS:
             els = self.driver.find_elements(
                 By.XPATH,
                 '//*[@id="buildqueue"]/tr[2]/td[2]/span[@data-endtime]'
@@ -203,7 +213,7 @@ class Build(Action):
                 waiting_time = datetime.now()
             elif len(re.findall('jutro', text)) > 0:
                 waiting_time = datetime.now() + timedelta(days=1)
-            elif len(re.findall('\d\d:\d\d:\d\d'), text) > 0:
+            elif len(re.findall('\d\d:\d\d:\d\d', text)) > 0:
                 delta = self._str_to_timedelta(text[-8:])
                 waiting_time = datetime.now() + delta
             else:
@@ -230,23 +240,22 @@ class Build(Action):
                 self.commissions)
 
     def _get_first_commission(self) -> Tuple[str, int]:
-        row = self.commissions[0]
-        if len(row) == 2:
-            row += [None]
-        elif len(row) == 3:
-            pass
-        else:
-            raise ValueError('Wrong number of arguments: "%s".' % str(row))
+        row = None
+        while len(self.commissions) > 0 and row is None:
+            row = self.commissions[0]
+            if len(row) == 2:
+                row += [None]
+            elif len(row) not in [2, 3]:
+                raise ValueError('Wrong number of arguments: "%s".' % str(row))
         return row
 
     def run(self):
         self.go_to(screen="main")
         self._build_priorities()
-        if len(self.commissions) == 0:
-            return None
 
-        row = self._get_first_commission()
-        waiting_time = self._build(row)
+        waiting_time, state = self._build_first_commission()
+        if state == CAN_BUILD and not self._queue_is_full():
+            self._build_first_commission()
         return waiting_time
 
     def _build_priorities(
@@ -301,35 +310,44 @@ class Build(Action):
         self._remove_first_commission()
         self.log("Removing first commission.", logging.WARN)
 
+    def _build_first_commission(self) -> Tuple[timedelta, int]:
         row = self._get_first_commission()
-        time_delta = self._build(row)
-        return time_delta
+        if row is None:
+            waiting_time, state = None, None
+        else:
+            waiting_time, state = self._build(row)
+        return waiting_time, state
 
     def _deal_with_unmet_requirements(self, building: str):
         self.log(
             'Unmet requirements for building "%s". ' % building,
             logging.WARN)
-        els = self.driver.find_elements(By.XPATH, '//*[@id="buildqueue"]/tr[2]/td[2]/span')
-        if len(els) > 0:
-            time_delta = self._str_to_timedelta(els[0].text)
-            self.log("Waiting until last building is built.", logging.WARN)
+        waiting_time = self._get_waiting_time(building, state=UNMET_REQUIREMENTS)
+        if waiting_time is None:
+            self._skip_first_commission()
+            waiting_time, state = self._build_first_commission()
         else:
-            time_delta = self._skip_first_commission()
-        return time_delta
+            self.log("Waiting until last building is built.", logging.INFO)
+            state = UNMET_REQUIREMENTS
+        return waiting_time, state
 
     def _deal_with_lack_of_resources(self, building: str, fundraise: Union[str, int, bool]) -> Optional[timedelta]:
-        if self._requirements_over_90_percents(building)\
-                and building != "storage":
+        if self._requirements_over_90_percents(building) and building != "storage":
             self._add_commission("storage", "1")
-            waiting_time = self._build("storage", "1")
+            waiting_time, state = self._build_first_commission()
         elif fundraise == '1' or fundraise == 1 or fundraise is True:
             self.set_fundraise(
                 self._get_building_cost(building), type(self)
             )
             waiting_time = self._get_waiting_time(building, state=LACK_OF_RESOURCES)
-        return waiting_time
+            state = LACK_OF_RESOURCES
+        return waiting_time, state
 
-    def _build(self, row: Tuple[str, Union[str, int, bool], int]) -> timedelta:
+    def _deal_with_lack_of_villagers(self, building: str, fundraise: Union[str, int, bool]) -> Optional[timedelta]:
+        pass
+
+    def _build(self, row: Tuple[str, Union[str, int, bool], int]) -> Tuple[timedelta, int]:
+        self.sleep()
         building, fundraise, max_time = row
         state = self._assert_build(building)
 
@@ -341,15 +359,19 @@ class Build(Action):
             waiting_time = self._get_waiting_time(building, state)
         elif state == UNKNOWN_BUILDING:
             self.log('Unknown building "%s".' % building, logging.WARN)
-            waiting_time = self._skip_first_commission()
+            self._skip_first_commission()
+            waiting_time, state = self._build_first_commission()
         elif state == FULLY_DEVELOPED:
-            self.log('Building "%s" is fully developed.' % building, logging.WARN)
+            self.log('Building "%s" is fully developed.' % building, logging.INFO)
             waiting_time = self._skip_first_commission()
+            waiting_time, state = self._build_first_commission()
         elif state == UNMET_REQUIREMENTS:
-            waiting_time = self._deal_with_unmet_requirements(building)
+            waiting_time, state = self._deal_with_unmet_requirements(building)
         elif state == LACK_OF_RESOURCES:
-            waiting_time = self._deal_with_lack_of_resources(building, fundraise)
-        return waiting_time
+            waiting_time, state = self._deal_with_lack_of_resources(building, fundraise)
+        elif state == LACK_OF_VILLAGERS:
+            waiting_time = self._get_waiting_time(building, state)
+        return waiting_time, state
 
     def _get_building_cost(self, building: str):
         wood = self.driver.find_element(

@@ -69,6 +69,8 @@ class Scavenge(Action):
             return
         self.sleep()
         for unit, amount in asdict(troops).items():
+            if amount == 0:
+                continue
             index = units_to_input_parser[unit]
 
             self.sleep(mu=0.35)

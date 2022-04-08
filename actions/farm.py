@@ -18,7 +18,6 @@ class Farm(Action):
         self.path = self.base_path / 'farm.json'
         self.com_id = com_id
         self.fs = self._read_farm_file()
-        self.next_attempt = timedelta(hours=2)
 
     def run(self) -> Union[timedelta, Dict[str, timedelta]]:
         self.go_to('place')

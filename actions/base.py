@@ -21,6 +21,7 @@ class Action(ABC):
         self.fundraise = input_.fundraise
         self.pp_limit = input_.pp_limit
         self.village_coordinates = input_.village_coordinates
+        self.next_attempt = input_.next_attempt
         self.base_path = Path('villages_commissions/' + input_.village_coordinates)
 
     def sleep(self, mu: float = 1.345, sig: float = 0.35):
@@ -38,6 +39,8 @@ class Action(ABC):
         url.args['screen'] = screen
         self.driver.get(url.url)
 
+        self.prevent_captcha()
+
         if mode is not None:
             self.change_mode(mode)
 
@@ -52,6 +55,25 @@ class Action(ABC):
             msg = 'Invalid mode "%s". Url: %s.' % (mode, url)
             self.log(msg, logging.ERROR)
             raise ValueError(msg)
+
+        self.prevent_captcha()
+
+    def prevent_captcha(self):
+        els = self.driver.find_elements(By.ID, 'popup_box_bot_protection')
+        if len(els) > 0:
+            print('Captcha detected.')
+            checkbox = els[0].find_element(By.ID, 'checkbox')
+            self.sleep()
+            checkbox.click()
+            self.sleep(3)
+
+        els = self.driver.find_elements(By.CLASS_NAME, 'captcha')
+        if len(els) > 0:
+            print('Captcha detected.')
+            checkbox = els[0].find_element(By.ID, 'checkbox')
+            self.sleep()
+            checkbox.click()
+            self.sleep(3)
 
     def get_resources(self, deduct_fundraise: bool = True) -> Cost:
         resources = Cost(
@@ -111,7 +133,7 @@ class Action(ABC):
         return delta
 
     def log_next_attempt_warning(self, cmd: str, td: timedelta) -> timedelta:
-        next_attempt = datetime.now() + timedelta(hours=1)
+        next_attempt = datetime.now() + td
         next_attempt_str = next_attempt.strftime("%Y-%m-%d, %H:%M:%S")
         self.log(
             "Cannot %s. Next attempt at %s." % (cmd, next_attempt_str),

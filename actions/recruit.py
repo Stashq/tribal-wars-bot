@@ -2,6 +2,7 @@ from dataclasses import fields, asdict
 from datetime import timedelta
 import logging
 import json
+import os
 from pathlib import Path
 from selenium.webdriver.common.by import By
 from typing import List, Union
@@ -16,7 +17,7 @@ class Recruit(Action):
     def __init__(self, input_: ActionInput):
         super().__init__(input_)
         self.path = self.base_path / 'recruit.json'
-        self.lowering_recources_path = self.base_path / 'recruit_to_prevent.json'
+        self.lowering_resources_path = self.base_path / 'recruit_to_prevent.json'
         self.costs = self._load_costs()
 
     def _load_costs(self) -> List[Cost]:
@@ -92,10 +93,14 @@ class Recruit(Action):
         return res
 
     def run(self) -> timedelta:
-        if self.lowering_recources_path.is_file():
-            rt = self._load_recruit_tactic(self.lowering_recources_path)
-            self.recruit(rt)
-            self.lowering_recources_path.unlink()  # removes file
+        if self.lowering_resources_path.is_file():
+            rt = self._load_recruit_tactic(self.lowering_resources_path)
+            try:
+                self.recruit(rt)
+            except:
+                self.log('Cannot recruit according to lowering resources strategy.', logging.WARN)
+            finally:
+                os.remove(self.lowering_resources_path)
 
         rt = self._load_recruit_tactic(self.path)
         self.recruit(rt)
@@ -145,4 +150,4 @@ class Recruit(Action):
             self.log("Cannot recruit %s" % unit, logging.WARN)
 
     def _get_waiting_time(self, recruit_tactic: RecruitTactic) -> timedelta:
-        return recruit_tactic.next_time
+        return recruit_tactic.time_delta

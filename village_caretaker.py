@@ -81,7 +81,7 @@ class VillageCaretaker:
             kwargs['com_id'] = com_id
         return kwargs
 
-    def _deal_with_action_exception(self, e: Exception):
+    def _deal_with_action_exception(self, e: Exception) -> timedelta:
         if not self.safe_mode:
             raise e
         self.log_error(e)
@@ -103,7 +103,9 @@ class VillageCaretaker:
             res = action.run()
         except Exception as e:
             res = self._deal_with_action_exception(e)
-            res = (res, action_kwargs.get('com_id'))
+            com_id = action_kwargs.get('com_id')
+            if com_id is not None:
+                res = (res, com_id)
         if res is not None:
             self.scheduler.set_waiting_time(action, res)
         if self.fundraise["action"] == Action_cls:

@@ -76,13 +76,13 @@ class Deputy:
             options=options,
             service=Service(
                 ChromeDriverManager(
-                    version="98.0.4758.102",
+                    version="100.0.4896.60",
                     print_first_line=False,
                     log_level=logging.ERROR
                 ).install()))
         self.driver.maximize_window()
         self.driver.execute_cdp_cmd('Network.setUserAgentOverride', {"userAgent":
-            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36'})
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.60 Safari/537.36'})
         self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
         return self.driver
 
@@ -106,6 +106,8 @@ class Deputy:
         except NoSuchElementException as e:
             pass
 
+        self.prevent_captcha()
+
         self.choose_world(world_nr)
         time.sleep(2)
 
@@ -116,6 +118,25 @@ class Deputy:
         #     .click()
         self.driver.find_element(By.XPATH, '//*[@id="home"]/div[3]/div[4]/div[10]/div[3]/div[2]/div[1]/a/span')\
             .click()
+
+        self.prevent_captcha()
+
+    def prevent_captcha(self):
+        els = self.driver.find_elements(By.ID, 'popup_box_bot_protection')
+        if len(els) > 0:
+            print('Captcha detected.')
+            checkbox = els[0].find_element(By.ID, 'checkbox')
+            self.sleep()
+            checkbox.click()
+            self.sleep(3)
+
+        els = self.driver.find_elements(By.CLASS_NAME, 'captcha')
+        if len(els) > 0:
+            print('Captcha detected.')
+            checkbox = els[0].find_element(By.ID, 'checkbox')
+            self.sleep()
+            checkbox.click()
+            self.sleep(3)
 
     def quit_session(self):
         self.sleep(2)
@@ -176,7 +197,7 @@ class Deputy:
         for vc in self.village_caretakers[1:]:
             if vc.next_time < first_vc.next_time:
                 first_vc = vc
-        return vc
+        return first_vc
 
     def first_run(self):
         FilesChecker().check_all_files()
