@@ -20,14 +20,18 @@ class Farm(Action):
         self.fs = self._read_farm_file()
 
     def run(self) -> Union[timedelta, Dict[str, timedelta]]:
+        if not self.if_run():
+            return None
+
         self.go_to('place')
-        if not self.fs.run:
-            waiting_times = self.next_attempt
-        elif self.com_id is not None:
+        if self.com_id is not None:
             waiting_times = self._run_single_commission(self.com_id)
         else:
             waiting_times = self._run_all_commissions()
         return waiting_times
+
+    def if_run(self) -> bool:
+        return self.fs.run
 
     def _enough_troops(self, troops: Troops):
         available = self._get_available_troops()

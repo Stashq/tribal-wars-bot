@@ -19,6 +19,25 @@ class Recruit(Action):
         self.path = self.base_path / 'recruit.json'
         self.lowering_resources_path = self.base_path / 'recruit_to_prevent.json'
         self.costs = self._load_costs()
+        self.recruit_tactic = self._load_recruit_tactic(self.path)
+
+    def run(self) -> timedelta:
+        if not self.if_run():
+            return None
+        if self.lowering_resources_path.is_file():
+            rt = self._load_recruit_tactic(self.lowering_resources_path)
+            try:
+                self.recruit(rt)
+            except:
+                self.log('Cannot recruit according to lowering resources strategy.', logging.WARN)
+            finally:
+                os.remove(self.lowering_resources_path)
+
+        self.recruit(self.recruit_tactic)
+        return self.recruit_tactic.time_delta
+
+    def if_run(self) -> bool:
+        return self.lowering_resources_path.is_file() or self.recruit_tactic.run
 
     def _load_costs(self) -> List[Cost]:
         with open('data/costs.json', "r") as file:
@@ -92,25 +111,13 @@ class Recruit(Action):
             res = rt.recruitment
         return res
 
-    def run(self) -> timedelta:
-        if self.lowering_resources_path.is_file():
-            rt = self._load_recruit_tactic(self.lowering_resources_path)
-            try:
-                self.recruit(rt)
-            except:
-                self.log('Cannot recruit according to lowering resources strategy.', logging.WARN)
-            finally:
-                os.remove(self.lowering_resources_path)
-
-        rt = self._load_recruit_tactic(self.path)
-        self.recruit(rt)
-
-        return rt.time_delta
-
     def _tactic_to_recruitment(self, rt: RecruitTactic) -> Recruitment:
         if rt.type_ == "proportions":
             rec = self._get_proportional_recruitment(rt)
+        elif rt.type_ == "values":
+            rec = self._adjust_recruitment(rt)
         else:
+            print('Unknown type of recruitment type. Running "values" recruitment type.')
             rec = self._adjust_recruitment(rt)
         return rec
 
@@ -122,7 +129,7 @@ class Recruit(Action):
             if self._building_is_needed(rec.stable):
                 self.recruit_in_building(rec.stable, "stable")
             if self._building_is_needed(rec.workshop):
-                self.recruit_in_building(rec.workshop, "workshop")
+                self.recruit_in_building(rec.workshop, "garage")
 
     def _building_is_needed(self, units: Union[Barracks, Stable, Workshop]):
         res = False

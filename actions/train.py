@@ -19,16 +19,19 @@ class Train(Action):
             minutes=self.settings["minutes_after_attempt"])
 
     def run(self) -> timedelta:
-        if not self.settings["run"]:
-            time_delta = None
+        if not self.if_run():
+            return None
+
+        self.go_to("statue")
+        if self._training_availability():
+            waiting_time = self._run_in_training_panel(
+                self._start_training)
         else:
-            self.go_to("statue")
-            if self._training_availability():
-                time_delta = self._run_in_training_panel(
-                    self._start_training)
-            else:
-                time_delta = self._get_waiting_time()
-        return time_delta
+            waiting_time = self._get_waiting_time()
+        return waiting_time
+
+    def if_run(self) -> bool:
+        return self.settings["run"]
 
     def _training_availability(self):
         els = self.driver.find_elements(

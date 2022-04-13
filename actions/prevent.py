@@ -30,6 +30,9 @@ class Prevent(Action):
             self._deal_with_resources_overflow(overflow)
         return None
 
+    def if_run(self) -> bool:
+        return True
+
     def _deal_with_overpopulation(
         self, overflow: dict
     ):

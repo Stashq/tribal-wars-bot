@@ -25,13 +25,36 @@ class Scavenge(Action):
     def __init__(self, input_: ActionInput):
         super().__init__(input_)
         self.path = self.base_path / 'scavenge.json'
+        self.scavenge_tactic = self.load_tactic()
+
+    def run(self) -> timedelta:
+        if not self.if_run():
+            return None
+        self.go_to(screen="place", mode="units")
+        available_troops, transported_troops = self._get_troops_info()
+
+        self.change_mode(mode="scavenge")
+        self.sleep()
+        self.driver.execute_script("window.scrollTo(0, 884)")
+
+        self.scavenge_tactic.lvls = self._filter_available_lvls(self.scavenge_tactic.lvls)
+        troops_per_lvl = self.scavenge_tactic.get_troops_per_lvl(
+            available_troops, transported_troops)
+        for lvl, troops in troops_per_lvl.items():
+            self._run_scavenging(lvl, troops)
+
+        waiting_time = self._get_waiting_time()
+        return waiting_time
+
+    def if_run(self) -> bool:
+        return self.scavenge_tactic.run
 
     def load_tactic(self):
         with open(self.path, "r") as file:
             tactic = json.load(file)
-        lvls = self._filter_lvls(tactic["lvls"])
+        lvls = tactic.get("lvls")
         tactic = ScavengeTactic(
-            divide=tactic["divide"],
+            divide=tactic.get("divide", {}),
             lvls=lvls,
             except_=Scavengers(**tactic.get("except_", {})),
             troops_lvl1=Scavengers(**tactic.get("lvl1", {})),
@@ -39,7 +62,6 @@ class Scavenge(Action):
             troops_lvl3=Scavengers(**tactic.get("lvl3", {})),
             troops_lvl4=Scavengers(**tactic.get("lvl4", {}))
         )
-        self.time_after_attempt = timedelta(minutes=60)
         return tactic
 
     def _filter_lvls(self, lvls: List[int]):
@@ -92,7 +114,7 @@ class Scavenge(Action):
         )
 
         if len(els) == 0:
-            waiting_time = self.time_after_attempt
+            waiting_time = self.next_attempt
         else:
             waiting_times = []
             for el in els:
@@ -117,6 +139,7 @@ class Scavenge(Action):
         return len(els) > 0
 
     def _get_transported_troops(self):
+        # TODO: iterate over all transported troops
         if self._transpored_troops_exists():
             units = [None] * 8
             for i in range(8):
@@ -133,20 +156,3 @@ class Scavenge(Action):
         available_troops = self._get_available_troops()
         transported_troops = self._get_transported_troops()
         return available_troops, transported_troops
-
-    def run(self, *args, **kwargs) -> timedelta:
-        self.go_to(screen="place", mode="units")
-        available_troops, transported_troops = self._get_troops_info()
-
-        self.change_mode(mode="scavenge")
-        self.sleep()
-        self.driver.execute_script("window.scrollTo(0, 884)")
-
-        st = self.load_tactic()
-        troops_per_lvl = st.get_troops_per_lvl(
-            available_troops, transported_troops)
-        for lvl, troops in troops_per_lvl.items():
-            self._run_scavenging(lvl, troops)
-
-        waiting_time = self._get_waiting_time()
-        return waiting_time

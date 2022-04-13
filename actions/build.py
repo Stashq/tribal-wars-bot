@@ -23,12 +23,29 @@ class Build(Action):
         allow_time_reducing: bool = False
     ):
         super().__init__(input_)
-        self.path = self.base_path / 'build.csv'
-        self.build_to_prevent_path = self.base_path / 'build_to_prevent.json'
-        with open(self.path, "r") as file:
-            commissions = list(csv.reader(file))
-        self.commissions = commissions
         self.allow_time_reducing = allow_time_reducing
+        self.path = self.base_path / 'build.csv'
+        with open(self.path, "r") as file:
+            self.commissions = list(csv.reader(file))
+        self.build_to_prevent_path = self.base_path / 'build_to_prevent.json'
+        with open(self.build_to_prevent_path, "r") as file:
+            self.priorities_order = json.load(file)
+
+    def run(self) -> timedelta:
+        if not self.if_run():
+            return None
+
+        self.go_to(screen="main")
+        self._build_priorities()
+
+        waiting_time, state = self._build_first_commission()
+        if state == CAN_BUILD and not self._queue_is_full():
+            self._build_first_commission()
+        return waiting_time
+
+    def if_run(self) -> bool:
+        return self.priorities_order['farm'] or self.priorities_order['storage']\
+            or len(self.commissions) > 0
 
     def _commission_building(self, building: str, max_time: timedelta = None):
         self.sleep()
@@ -216,6 +233,11 @@ class Build(Action):
             elif len(re.findall('\d\d:\d\d:\d\d', text)) > 0:
                 delta = self._str_to_timedelta(text[-8:])
                 waiting_time = datetime.now() + delta
+            elif len(re.findall('\d\d.\d\d. o \d\d:\d\d')) > 0:
+                day = datetime.strptime(text[22:27], '%d.%m')
+                day_time = self._str_to_timedelta(text[31:36], '%H:%M')
+                waiting_time = day + day_time
+                waiting_time.replace(year=datetime.now().year)
             else:
                 raise ValueError("!!! Unknown text: %s" % text)
             waiting_time = waiting_time.replace(hour=int(text[-5:-3]))
@@ -242,47 +264,43 @@ class Build(Action):
     def _get_first_commission(self) -> Tuple[str, int]:
         row = None
         while len(self.commissions) > 0 and row is None:
-            row = self.commissions[0]
-            if len(row) == 2:
+            row = self.commissions.pop(0)
+            if len(row) == 0:
+                row = None
+            if len(row) == 1:
+                row += [0, None]
+            elif len(row) == 2:
                 row += [None]
-            elif len(row) not in [2, 3]:
+            elif len(row) == 3:
+                pass
+            else:
                 raise ValueError('Wrong number of arguments: "%s".' % str(row))
         return row
-
-    def run(self):
-        self.go_to(screen="main")
-        self._build_priorities()
-
-        waiting_time, state = self._build_first_commission()
-        if state == CAN_BUILD and not self._queue_is_full():
-            self._build_first_commission()
-        return waiting_time
 
     def _build_priorities(
         self
     ):
-        with open(self.build_to_prevent_path, "r") as file:
-            priorities_order = json.load(file)
-
-        self._build_priority(priorities_order, "farm")
-        self._build_priority(priorities_order, "storage")
+        if self.priorities_order['farm']:
+            self._build_priority('farm')
+        if self.priorities_order['storage']:
+            self._build_priority('storage')
 
         with open(self.build_to_prevent_path, "w") as file:
-            json.dump(priorities_order, file)
+            json.dump(self.priorities_order, file)
 
-    def _build_priority(self, priorities_order: dict, building: Literal["farm", "storage"]):
+    def _build_priority(self, building: Literal["farm", "storage"]):
         if building == "farm":
             max_depth = 2
         elif building == "storage":
             max_depth = 1
-        if priorities_order[building] in ["1", "True", 1, True]\
-                and priorities_order[building + "_in_process"] not in ["1", "True", 1, True]:
+        if self.priorities_order[building]\
+                and not self.priorities_order[building + "_in_process"]:
             self._add_commission(building, 1)
-            priorities_order[building] = False
-            priorities_order[building + "_in_process"] = True
-        elif priorities_order[building + "_in_process"]\
+            self.priorities_order[building] = False
+            self.priorities_order[building + "_in_process"] = True
+        elif self.priorities_order[building + "_in_process"]\
                 and not self._building_in_plans(building, max_depth=max_depth):
-            priorities_order[building + "_in_process"] = False
+            self.priorities_order[building + "_in_process"] = False
 
     def _building_in_plans(
         self, building: str, max_depth: int = None

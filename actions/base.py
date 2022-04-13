@@ -120,6 +120,10 @@ class Action(ABC):
     def run(self, *args, **kwargs) -> Union[datetime, timedelta]:
         pass
 
+    @abstractmethod
+    def if_run(self) -> bool:
+        pass
+
     def __call__(self, *args, **kwargs) -> Union[datetime, timedelta]:
         return self.run(*args, **kwargs)
 

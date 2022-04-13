@@ -7,7 +7,8 @@ from data_types import Scavengers
 
 @dataclass
 class ScavengeTactic:
-    divide: int = None
+    run: bool = True
+    divide: bool = False
     lvls: list = field(default_factory=lambda: [2, 3, 4])
     except_: Scavengers = Scavengers()
     troops_lvl1: Scavengers = Scavengers()
@@ -20,10 +21,12 @@ class ScavengeTactic:
             value = getattr(self.except_, unit.name)
             assert isinstance(value, int) or value == "all"
 
-        assert self.divide is None\
-            or isinstance(self.divide, int) and self.divide in [0, 1]
+        assert isinstance(self.divide, bool)
 
-        if self.divide is None or self.divide == 0:
+        if self.lvls is None:
+            self.lvls = [2, 3, 4]
+
+        if not self.divide:
             for troops in [self.troops_lvl1, self.troops_lvl2, self.troops_lvl3, self.troops_lvl4]:
                 assert not self._troops_are_empty(troops)
 
@@ -35,7 +38,7 @@ class ScavengeTactic:
         available_troops = self._subtract_troops(available_troops, transported_troops, self.except_)[0]
         if len(self.lvls) == 0:
             result = {}
-        elif self.divide == 1:
+        elif self.divide:
             result = self._devide_troops(
                 available_troops, divisions=len(self.lvls))
         else:
